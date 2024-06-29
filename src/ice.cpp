@@ -5,13 +5,8 @@
 
 namespace ice {
 namespace {
-auto on_state_changed(juice_agent_t* const agent, const juice_state_t state, void* const /*user_ptr*/) -> void {
+auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const /*user_ptr*/) -> void {
     PRINT("state changed: ", juice_state_to_string(state));
-
-    if(state == JUICE_STATE_CONNECTED) {
-        const auto message = "Hello!!!";
-        juice_send(agent, message, strlen(message));
-    }
 }
 
 auto on_candidate(juice_agent_t* const /*agent*/, const char* const sdp, void* const user_ptr) -> void {
@@ -79,12 +74,6 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
     }
 }
 
-auto IceSession::wait_for_success() -> bool {
-    result_event.wait();
-    result_event.clear();
-    return result;
-}
-
 auto IceSession::start(const char* const server, const uint16_t port, const std::string_view pad_name, const std::string_view target_pad_name, const char* turn_server, uint16_t turn_port) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
         PRINT("received ", payload.size(), " bytes");
@@ -139,6 +128,18 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
 
     PRINT(pad_name, " result: ", juice_state_to_string(juice_get_state(agent.get())));
 
+    return true;
+}
+
+auto IceSession::wait_for_success() -> bool {
+    result_event.wait();
+    result_event.clear();
+    return result;
+}
+
+auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool {
+    const auto len = juice_send(agent.get(), (const char*)payload.data(), payload.size());
+    PRINT("<<< ", len, " bytes");
     return true;
 }
 } // namespace ice
