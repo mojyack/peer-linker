@@ -43,10 +43,16 @@ inline auto add_parameters(std::vector<std::byte>& buffer, Arg arg, Args... args
 }
 
 template <class... Args>
-inline auto send_packet(lws* wsi, Type type, Args... args) -> void {
+inline auto build_packet(Type type, Args... args) -> std::vector<std::byte> {
     auto buffer = std::vector<std::byte>(sizeof(Packet));
     add_parameters(buffer, args...);
     *(std::bit_cast<Packet*>(buffer.data())) = Packet{uint16_t(buffer.size()), type};
+    return buffer;
+}
+
+template <class... Args>
+inline auto send_packet(lws* wsi, Type type, Args... args) -> void {
+    const auto buffer = build_packet(type, args...);
     ws::write_back(wsi, buffer.data(), buffer.size());
 }
 } // namespace proto
