@@ -18,6 +18,9 @@ enum class Type : uint16_t {
     SetCandidates,
     AddCandidates,
     GatheringDone,
+
+    // marker
+    Limit,
 };
 
 struct Packet {
