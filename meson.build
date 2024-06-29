@@ -18,7 +18,7 @@ server_files = files(
 ) + common_files + ws_files + ws_server_files
 
 client_files = files(
-  'src/client.cpp',
+  'example/client.cpp',
   'src/ice.cpp',
 ) + common_files + ws_files + ws_client_files
 

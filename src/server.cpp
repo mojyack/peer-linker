@@ -3,7 +3,6 @@
 #include "signaling-protocol-helper.hpp"
 #include "util/assert.hpp"
 #include "util/string-map.hpp"
-#include "ws-session.hpp"
 #include "ws/misc.hpp"
 
 namespace {

@@ -1,8 +1,8 @@
 #include <thread>
 
-#include "ice.hpp"
 #include "macros/assert.hpp"
-#include "signaling-protocol-helper.hpp"
+#include "p2p/ice.hpp"
+#include "p2p/signaling-protocol-helper.hpp"
 #include "util/assert.hpp"
 
 namespace {
