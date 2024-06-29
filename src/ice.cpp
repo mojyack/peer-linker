@@ -3,7 +3,7 @@
 #include "signaling-protocol-helper.hpp"
 #include "util/assert.hpp"
 
-namespace ice {
+namespace p2p::ice {
 namespace {
 auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const /*user_ptr*/) -> void {
     PRINT("state changed: ", juice_state_to_string(state));
@@ -142,4 +142,4 @@ auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool 
     PRINT("<<< ", len, " bytes");
     return true;
 }
-} // namespace ice
+} // namespace p2p::ice

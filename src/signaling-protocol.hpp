@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-namespace proto {
+namespace p2p::proto {
 // client <-> (peer: server :peer) <-> client
 
 enum class Type : uint16_t {
@@ -58,4 +58,4 @@ struct AddCandidates : Packet {
 
 struct GatheringDone : Packet {
 };
-} // namespace proto
+} // namespace p2p::proto

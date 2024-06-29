@@ -5,6 +5,7 @@
 #include "util/string-map.hpp"
 #include "ws/misc.hpp"
 
+namespace p2p {
 namespace {
 struct Pad {
     std::string name;
@@ -216,7 +217,8 @@ auto run() -> bool {
     return true;
 }
 } // namespace
+} // namespace p2p
 
 auto main() -> int {
-    return run() ? 0 : 1;
+    return p2p::run() ? 0 : 1;
 }

@@ -5,7 +5,7 @@
 #include "util/event.hpp"
 #include "ws/client.hpp"
 
-namespace ice {
+namespace p2p::ice {
 declare_autoptr(JuiceAgent, juice_agent_t, juice_destroy);
 
 struct IceSession {
@@ -26,4 +26,4 @@ struct IceSession {
     auto wait_for_success() -> bool;
     auto send_payload(const std::span<const std::byte> payload) -> bool;
 };
-} // namespace ice
+} // namespace p2p::ice

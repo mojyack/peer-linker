@@ -11,18 +11,18 @@ namespace {
 const auto server_domain = "localhost";
 const auto server_port   = 8080;
 
-struct ClientSession : ice::IceSession {
+struct ClientSession : p2p::ice::IceSession {
     auto handle_payload(const std::span<const std::byte> payload) -> bool override {
-        const auto header = *std::bit_cast<proto::Packet*>(payload.data());
+        const auto header = *std::bit_cast<p2p::proto::Packet*>(payload.data());
         switch(header.type) {
-        case proto::Type::LinkAuth: {
-            const auto requester_name = proto::extract_last_string<proto::LinkAuth>(payload);
+        case p2p::proto::Type::LinkAuth: {
+            const auto requester_name = p2p::proto::extract_last_string<p2p::proto::LinkAuth>(payload);
             PRINT("received link request from name: ", requester_name);
-            proto::send_packet(websocket_context.wsi, proto::Type::LinkAuthResponse, uint16_t(requester_name == "agent a"), requester_name);
+            p2p::proto::send_packet(websocket_context.wsi, p2p::proto::Type::LinkAuthResponse, uint16_t(requester_name == "agent a"), requester_name);
             return true;
         }
         default:
-            return ice::IceSession::handle_payload(payload);
+            return p2p::ice::IceSession::handle_payload(payload);
         }
     }
 };

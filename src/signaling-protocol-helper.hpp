@@ -5,7 +5,7 @@
 #include "ws/impl.hpp"
 #include "ws/misc.hpp"
 
-namespace proto {
+namespace p2p::proto {
 template <class T>
 auto extract_payload(const std::span<const std::byte> payload) -> const T* {
     if(payload.size() <= sizeof(T)) {
@@ -55,4 +55,4 @@ inline auto send_packet(lws* wsi, Type type, Args... args) -> void {
     const auto buffer = build_packet(type, args...);
     ws::write_back(wsi, buffer.data(), buffer.size());
 }
-} // namespace proto
+} // namespace p2p::proto
