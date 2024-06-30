@@ -158,12 +158,11 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
 }
 
 auto IceSession::stop() -> void {
-    if(!connected) {
-        return;
-    }
     set_connected(*this, false);
     websocket_context.shutdown();
-    signaling_worker.join();
+    if(signaling_worker.joinable()) {
+        signaling_worker.join();
+    }
 }
 
 auto IceSession::wait_for_success() -> bool {
