@@ -19,7 +19,7 @@ inline auto extract_header(const std::span<const std::byte> payload) -> const Pa
 
 template <class T>
 auto extract_payload(const std::span<const std::byte> payload) -> const T* {
-    if(payload.size() <= sizeof(T)) {
+    if(payload.size() < sizeof(T)) {
         return nullptr;
     }
     return std::bit_cast<T*>(payload.data());
