@@ -30,6 +30,6 @@ struct IceSession {
     auto send_payload(const std::span<const std::byte> payload) -> bool;
     auto send_payload_relayed(const std::span<const std::byte> payload) -> bool;
 
-    ~IceSession();
+    virtual ~IceSession();
 };
 } // namespace p2p::ice
