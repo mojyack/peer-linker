@@ -54,6 +54,7 @@ struct Server {
             return;
         }
         if(pad->linked) {
+            send_packet(pad->linked->wsi, proto::Type::Unlinked);
             pad->linked->linked = nullptr;
         }
         pads.erase(pad->name);
@@ -122,6 +123,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         assert_b(pad->linked != nullptr, estr[Error::NotLinked]);
 
         PRINT("unlinking pad ", pad->name, " and ", pad->linked->name);
+        send_packet(pad->linked->wsi, proto::Type::Unlinked);
         pad->linked->linked = nullptr;
         pad->linked         = nullptr;
 
