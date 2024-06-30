@@ -24,6 +24,7 @@ auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state,
         break;
     case JUICE_STATE_FAILED:
         set_connected(session, false);
+        session.on_disconnected();
         break;
     default:
         break;
@@ -50,6 +51,10 @@ auto on_recv(juice_agent_t* const /*agent*/, const char* const data, const size_
 
 auto IceSession::on_p2p_data(const std::span<const std::byte> payload) -> void {
     PRINT("p2p data received: ", payload.size(), " bytes");
+}
+
+auto IceSession::on_disconnected() -> void {
+    PRINT("session disconnected");
 }
 
 auto IceSession::handle_payload(const std::span<const std::byte> payload) -> bool {
