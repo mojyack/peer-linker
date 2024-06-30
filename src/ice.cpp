@@ -141,8 +141,7 @@ auto IceSession::wait_for_success() -> bool {
 }
 
 auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool {
-    const auto len = juice_send(agent.get(), (const char*)payload.data(), payload.size());
-    PRINT("<<< ", len, " bytes");
+    assert_b(juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0);
     return true;
 }
 
