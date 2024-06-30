@@ -4,28 +4,30 @@
 namespace p2p::proto {
 // client <-> (peer: server :peer) <-> client
 
-enum class Type : uint16_t {
-    Success,          // server <-> client
-    Error,            // server <-> cleint
-    Register,         // server <-  client  create peer in server
-    Unregister,       // server <-  client  delete peer in server
-    Link,             // server <-  client  ask server to link self to another peer
-    Unlink,           // server <-  client  delete link
-    LinkAuth,         // server  -> client  ask client to whether this peer is linkable to him
-    LinkAuthResponse, // server <-  client  accept peer to link
+struct Type {
+    enum : uint16_t {
+        Success,          // server <-> client
+        Error,            // server <-> cleint
+        Register,         // server <-  client  create peer in server
+        Unregister,       // server <-  client  delete peer in server
+        Link,             // server <-  client  ask server to link self to another peer
+        Unlink,           // server <-  client  delete link
+        LinkAuth,         // server  -> client  ask client to whether this peer is linkable to him
+        LinkAuthResponse, // server <-  client  accept peer to link
 
-    // following commands are valid only when linked
-    SetCandidates,
-    AddCandidates,
-    GatheringDone,
+        // following commands are valid only when linked
+        SetCandidates,
+        AddCandidates,
+        GatheringDone,
 
-    // marker
-    Limit,
+        // marker
+        Limit,
+    };
 };
 
 struct Packet {
     uint16_t size; // total size in bytes, including this header
-    Type     type;
+    uint16_t type;
 };
 
 struct Register : Packet {
