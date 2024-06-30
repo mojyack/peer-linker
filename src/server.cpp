@@ -69,10 +69,7 @@ struct Session {
 };
 
 auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
-    assert_b(payload.size() >= sizeof(proto::Packet), "payload too short");
-    const auto header = *std::bit_cast<proto::Packet*>(payload.data());
-    assert_b(header.size == payload.size(), "payload size mismatched");
-
+    unwrap_pb(header, proto::extract_header(payload));
     switch(header.type) {
     case proto::Type::Register: {
         const auto name = proto::extract_last_string<proto::Register>(payload);

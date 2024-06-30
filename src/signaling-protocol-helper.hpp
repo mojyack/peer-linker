@@ -1,11 +1,20 @@
 #pragma once
 #include <string_view>
 
+#include "macros/assert.hpp"
 #include "signaling-protocol.hpp"
+#include "util/assert.hpp"
 #include "ws/impl.hpp"
 #include "ws/misc.hpp"
 
 namespace p2p::proto {
+inline auto extract_header(const std::span<const std::byte> payload) -> const Packet* {
+    assert_p(payload.size() >= sizeof(proto::Packet), "payload too short");
+    const auto& header = *std::bit_cast<proto::Packet*>(payload.data());
+    assert_p(header.size == payload.size(), "payload size mismatched");
+    return &header;
+}
+
 template <class T>
 auto extract_payload(const std::span<const std::byte> payload) -> const T* {
     if(payload.size() <= sizeof(T)) {
@@ -31,6 +40,12 @@ inline auto add_parameter(std::vector<std::byte>& buffer, const std::string_view
     const auto prev_size = buffer.size();
     buffer.resize(prev_size + str.size());
     memcpy(buffer.data() + prev_size, str.data(), str.size());
+}
+
+inline auto add_parameter(std::vector<std::byte>& buffer, const std::span<const std::byte> data) -> void {
+    const auto prev_size = buffer.size();
+    buffer.resize(prev_size + data.size());
+    memcpy(buffer.data() + prev_size, data.data(), data.size());
 }
 
 inline auto add_parameters(std::vector<std::byte>&) -> void {

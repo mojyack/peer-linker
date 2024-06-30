@@ -1,5 +1,5 @@
 #include "ice.hpp"
-#include "macros/assert.hpp"
+#include "macros/unwrap.hpp"
 #include "signaling-protocol-helper.hpp"
 #include "util/assert.hpp"
 
@@ -31,9 +31,7 @@ auto IceSession::on_p2p_data(const std::span<const std::byte> payload) -> void {
 }
 
 auto IceSession::handle_payload(const std::span<const std::byte> payload) -> bool {
-    assert_b(payload.size() >= sizeof(proto::Packet), "payload too short");
-    const auto header = *std::bit_cast<proto::Packet*>(payload.data());
-    assert_b(header.size == payload.size(), "payload size mismatched");
+    unwrap_pb(header, p2p::proto::extract_header(payload));
 
     switch(header.type) {
     case proto::Type::Success:
