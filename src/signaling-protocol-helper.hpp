@@ -1,17 +1,19 @@
 #pragma once
 #include <string_view>
 
-#include "macros/assert.hpp"
 #include "signaling-protocol.hpp"
-#include "util/assert.hpp"
 #include "ws/impl.hpp"
 #include "ws/misc.hpp"
 
 namespace p2p::proto {
 inline auto extract_header(const std::span<const std::byte> payload) -> const Packet* {
-    assert_p(payload.size() >= sizeof(proto::Packet), "payload too short");
+    if(payload.size() < sizeof(proto::Packet)) {
+        return nullptr;
+    }
     const auto& header = *std::bit_cast<proto::Packet*>(payload.data());
-    assert_p(header.size == payload.size(), "payload size mismatched");
+    if(header.size != payload.size()) {
+        return nullptr;
+    }
     return &header;
 }
 

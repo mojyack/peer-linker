@@ -1,6 +1,6 @@
 #include <thread>
 
-#include "macros/assert.hpp"
+#include "macros/unwrap.hpp"
 #include "p2p/ice.hpp"
 #include "p2p/signaling-protocol-helper.hpp"
 #include "util/assert.hpp"
@@ -13,7 +13,7 @@ const auto server_port   = 8080;
 
 struct ClientSession : p2p::ice::IceSession {
     auto handle_payload(const std::span<const std::byte> payload) -> bool override {
-        const auto header = *std::bit_cast<p2p::proto::Packet*>(payload.data());
+        unwrap_pb(header, p2p::proto::extract_header(payload));
         switch(header.type) {
         case p2p::proto::Type::LinkAuth: {
             const auto requester_name = p2p::proto::extract_last_string<p2p::proto::LinkAuth>(payload);
