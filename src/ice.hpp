@@ -1,7 +1,8 @@
 #pragma once
 #include <thread>
 
-#include "juice.h"
+#include <juice/juice.h>
+
 #include "util/event.hpp"
 #include "ws/client.hpp"
 
