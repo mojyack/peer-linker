@@ -174,7 +174,6 @@ auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool 
 }
 
 auto IceSession::send_payload_relayed(const std::span<const std::byte> payload) -> bool {
-    assert_b(connected);
     ws::write_back(websocket_context.wsi, payload.data(), payload.size());
     return true;
 }
