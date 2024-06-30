@@ -12,6 +12,7 @@ struct Type {
         Unregister,       // server <-  client  delete peer in server
         Link,             // server <-  client  ask server to link self to another peer
         Unlink,           // server <-  client  delete link
+        Unlinked,         // server  -> client  notify client to unlinked by other pad
         LinkAuth,         // server  -> client  ask client to whether this peer is linkable to him
         LinkAuthResponse, // server <-  client  accept peer to link
 
