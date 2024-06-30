@@ -30,7 +30,6 @@ struct ClientSession : p2p::ice::IceSession {
 auto main(bool a) -> bool {
     auto session = ClientSession();
     assert_b(session.start(server_domain, server_port, a ? "agent a" : "agent b", a ? "agent b" : "", "stun.l.google.com", 19302));
-    session.connected_event.wait();
     return true;
 }
 

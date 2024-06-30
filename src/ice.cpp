@@ -5,11 +5,28 @@
 
 namespace p2p::ice {
 namespace {
+auto set_result(IceSession& session, const bool result) -> void {
+    session.result = result;
+    session.result_event.wakeup();
+}
+
+auto set_connected(IceSession& session, const bool connected) -> void {
+    session.connected = connected;
+    set_result(session, connected);
+}
+
 auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const user_ptr) -> void {
     PRINT("state changed: ", juice_state_to_string(state));
-    if(state == JUICE_STATE_COMPLETED) {
-        auto& session = *std::bit_cast<IceSession*>(user_ptr);
-        session.connected_event.wakeup();
+    auto& session = *std::bit_cast<IceSession*>(user_ptr);
+    switch(state) {
+    case JUICE_STATE_COMPLETED:
+        set_connected(session, true);
+        break;
+    case JUICE_STATE_FAILED:
+        set_connected(session, false);
+        break;
+    default:
+        break;
     }
 }
 
@@ -40,12 +57,10 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
 
     switch(header.type) {
     case proto::Type::Success:
-        result = true;
-        result_event.wakeup();
+        set_result(*this, true);
         return true;
     case proto::Type::Error:
-        result = false;
-        result_event.wakeup();
+        set_result(*this, false);
         return true;
     case proto::Type::SetCandidates: {
         const auto sdp = proto::extract_last_string<proto::SetCandidates>(payload);
@@ -91,6 +106,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
         while(websocket_context.state == ws::client::State::Connected) {
             websocket_context.process();
         }
+        set_connected(*this, false);
     });
 
     const auto controlled = target_pad_name.empty();
@@ -129,16 +145,20 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     juice_gather_candidates(agent.get());
     gathering_done_event.wait();
 
-    PRINT(pad_name, " result: ", juice_state_to_string(juice_get_state(agent.get())));
+    while(!connected) {
+        assert_b(wait_for_success());
+    }
 
     return true;
 }
 
 auto IceSession::stop() -> void {
-    websocket_context.shutdown();
-    if(signaling_worker.joinable()) {
-        signaling_worker.join();
+    if(!connected) {
+        return;
     }
+    set_connected(*this, false);
+    websocket_context.shutdown();
+    signaling_worker.join();
 }
 
 auto IceSession::wait_for_success() -> bool {
@@ -148,11 +168,13 @@ auto IceSession::wait_for_success() -> bool {
 }
 
 auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool {
+    assert_b(connected);
     assert_b(juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0);
     return true;
 }
 
 auto IceSession::send_payload_relayed(const std::span<const std::byte> payload) -> bool {
+    assert_b(connected);
     ws::write_back(websocket_context.wsi, payload.data(), payload.size());
     return true;
 }
