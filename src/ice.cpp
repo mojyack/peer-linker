@@ -134,6 +134,13 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     return true;
 }
 
+auto IceSession::stop() -> void {
+    websocket_context.shutdown();
+    if(signaling_worker.joinable()) {
+        signaling_worker.join();
+    }
+}
+
 auto IceSession::wait_for_success() -> bool {
     result_event.wait();
     result_event.clear();
@@ -148,5 +155,9 @@ auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool 
 auto IceSession::send_payload_relayed(const std::span<const std::byte> payload) -> bool {
     ws::write_back(websocket_context.wsi, payload.data(), payload.size());
     return true;
+}
+
+IceSession::~IceSession() {
+    stop();
 }
 } // namespace p2p::ice
