@@ -2,26 +2,14 @@ project('app', 'cpp', version: '1.0.0', default_options : ['warning_level=3', 'w
 add_project_arguments('-Wfatal-errors', language: 'cpp')
 add_project_arguments('-Wno-missing-field-initializers', language: 'cpp')
 
-subdir('src/ws')
+subdir('src')
 
-deps = [
-  dependency('libjuice'),
-] + ws_deps
-
-libws_dep = dependency('libwebsockets')
-
-common_files = files(
-)
-
-server_files = files(
-  'src/server.cpp',
-) + common_files + ws_files + ws_server_files
+server_files = files('src/server.cpp') + ws_files + ws_server_files
 
 client_files = files(
   'example/client.cpp',
-  'src/ice.cpp',
-) + common_files + ws_files + ws_client_files
+) + p2p_files
 
 
-executable('server', server_files, dependencies : deps)
-executable('client', client_files, dependencies : deps)
+executable('server', server_files, dependencies : p2p_deps)
+executable('client', client_files, dependencies : p2p_deps)
