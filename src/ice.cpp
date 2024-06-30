@@ -5,8 +5,12 @@
 
 namespace p2p::ice {
 namespace {
-auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const /*user_ptr*/) -> void {
+auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const user_ptr) -> void {
     PRINT("state changed: ", juice_state_to_string(state));
+    if(state == JUICE_STATE_COMPLETED) {
+        auto& session = *std::bit_cast<IceSession*>(user_ptr);
+        session.connected_event.wakeup();
+    }
 }
 
 auto on_candidate(juice_agent_t* const /*agent*/, const char* const sdp, void* const user_ptr) -> void {

@@ -17,6 +17,7 @@ struct IceSession {
     Event          sdp_set_event;
     Event          gathering_done_event;
     Event          result_event;
+    Event          connected_event;
     bool           result;
 
     virtual auto on_p2p_data(std::span<const std::byte> payload) -> void;
