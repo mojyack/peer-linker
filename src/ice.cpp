@@ -11,8 +11,9 @@ auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state,
 
 auto on_candidate(juice_agent_t* const /*agent*/, const char* const sdp, void* const user_ptr) -> void {
     PRINT("new candidate: ", sdp);
-    const auto wsi = std::bit_cast<IceSession*>(user_ptr)->websocket_context.wsi;
-    proto::send_packet(wsi, proto::Type::AddCandidates, std::string_view(sdp));
+    auto& session = *std::bit_cast<IceSession*>(user_ptr);
+    session.gathering_done_event.wakeup();
+    proto::send_packet(session.websocket_context.wsi, proto::Type::AddCandidates, std::string_view(sdp));
 }
 
 auto on_gathering_done(juice_agent_t* const /*agent*/, void* const user_ptr) -> void {
