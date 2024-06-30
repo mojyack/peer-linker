@@ -2,19 +2,19 @@
 #include <cstdint>
 
 namespace p2p::proto {
-// client <-> (peer: server :peer) <-> client
+// client <-> (pad: server :pad) <-> client
 
 struct Type {
     enum : uint16_t {
         Success,          // server <-> client
         Error,            // server <-> cleint
-        Register,         // server <-  client  create peer in server
-        Unregister,       // server <-  client  delete peer in server
-        Link,             // server <-  client  ask server to link self to another peer
+        Register,         // server <-  client  create pad in server
+        Unregister,       // server <-  client  delete pad in server
+        Link,             // server <-  client  ask server to link self pad to another pad
         Unlink,           // server <-  client  delete link
         Unlinked,         // server  -> client  notify client to unlinked by other pad
-        LinkAuth,         // server  -> client  ask client to whether this peer is linkable to him
-        LinkAuthResponse, // server <-  client  accept peer to link
+        LinkAuth,         // server  -> client  ask client to whether a pad is linkable to his
+        LinkAuthResponse, // server <-  client  accept pad linking
 
         // following commands are valid only when linked
         SetCandidates,
