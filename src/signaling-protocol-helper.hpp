@@ -1,6 +1,8 @@
 #pragma once
 #include <string_view>
 
+#include <cstring>
+
 #include "signaling-protocol.hpp"
 #include "ws/impl.hpp"
 #include "ws/misc.hpp"
@@ -41,13 +43,13 @@ inline auto add_parameter(std::vector<std::byte>& buffer, const T num) -> void {
 inline auto add_parameter(std::vector<std::byte>& buffer, const std::string_view str) -> void {
     const auto prev_size = buffer.size();
     buffer.resize(prev_size + str.size());
-    memcpy(buffer.data() + prev_size, str.data(), str.size());
+    std::memcpy(buffer.data() + prev_size, str.data(), str.size());
 }
 
 inline auto add_parameter(std::vector<std::byte>& buffer, const std::span<const std::byte> data) -> void {
     const auto prev_size = buffer.size();
     buffer.resize(prev_size + data.size());
-    memcpy(buffer.data() + prev_size, data.data(), data.size());
+    std::memcpy(buffer.data() + prev_size, data.data(), data.size());
 }
 
 inline auto add_parameters(std::vector<std::byte>&) -> void {
