@@ -1,4 +1,4 @@
-prefix=@PREFIX@
+prefix=${pcfiledir}/../..
 
 Name: libjuice
 Description: UDP Interactive Connectivity Establishment

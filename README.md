@@ -15,7 +15,6 @@ git clone git@github.com/mojyack/p2p-signaling-server.git
 mkdir -p $PREFIX/lib/pkgconfig
 cd p2p-signaling-server
 cp files/libjuice.pc $PREFIX/lib/pkgconfig
-sed -i "s|@PREFIX@|${PREFIX}|" $PREFIX/lib/pkgconfig/libjuice.pc
 PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig meson setup debug
 ninja -C debug
 # run
