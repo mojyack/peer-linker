@@ -11,5 +11,5 @@ client_files = files(
 ) + p2p_files
 
 
-executable('server', server_files, dependencies : p2p_deps)
+executable('server', server_files, dependencies : ws_deps)
 executable('client', client_files, dependencies : p2p_deps)
