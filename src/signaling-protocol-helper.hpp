@@ -1,7 +1,6 @@
 #pragma once
-#include <string_view>
-
 #include <cstring>
+#include <string_view>
 
 #include "signaling-protocol.hpp"
 #include "ws/impl.hpp"
