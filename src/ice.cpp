@@ -5,9 +5,31 @@
 
 namespace p2p::ice {
 namespace {
+struct EventKind {
+    enum {
+        None = 0,
+        SDPSet,
+        GatheringDone,
+        Result,
+    };
+};
+
+auto set_event(IceSession& session, const int kind) -> void {
+    if(session.event_kind != EventKind::None) {
+        WARN("overwriting previous event");
+    }
+    session.event_kind = kind;
+    session.event.wakeup();
+}
+
+auto wait_for_event(IceSession& session, const int kind) -> bool {
+    session.event.wait();
+    return std::exchange(session.event_kind, EventKind::None) == kind;
+}
+
 auto set_result(IceSession& session, const bool result) -> void {
     session.result = result;
-    session.result_event.wakeup();
+    set_event(session, EventKind::Result);
 }
 
 auto set_connected(IceSession& session, const bool connected) -> void {
@@ -34,7 +56,7 @@ auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state,
 auto on_candidate(juice_agent_t* const /*agent*/, const char* const sdp, void* const user_ptr) -> void {
     PRINT("new candidate: ", sdp);
     auto& session = *std::bit_cast<IceSession*>(user_ptr);
-    session.gathering_done_event.wakeup();
+    set_event(session, EventKind::GatheringDone);
     proto::send_packet(session.websocket_context.wsi, proto::Type::AddCandidates, std::string_view(sdp));
 }
 
@@ -71,7 +93,7 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
         const auto sdp = proto::extract_last_string<proto::SetCandidates>(payload);
         PRINT("received remote candidates: ", sdp);
         juice_set_remote_description(agent.get(), sdp.data());
-        sdp_set_event.wakeup();
+        set_event(*this, EventKind::SDPSet);
 
         proto::send_packet(websocket_context.wsi, proto::Type::Success);
         return true;
@@ -138,7 +160,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     }
     agent.reset(juice_create(&config));
     if(controlled) {
-        sdp_set_event.wait();
+        assert_b(wait_for_event(*this, EventKind::SDPSet));
     }
 
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
@@ -148,7 +170,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     assert_b(wait_for_success());
 
     juice_gather_candidates(agent.get());
-    gathering_done_event.wait();
+    assert_b(wait_for_event(*this, EventKind::GatheringDone));
 
     while(!connected) {
         assert_b(wait_for_success());
@@ -166,8 +188,7 @@ auto IceSession::stop() -> void {
 }
 
 auto IceSession::wait_for_success() -> bool {
-    result_event.wait();
-    result_event.clear();
+    assert_b(wait_for_event(*this, EventKind::Result));
     return result;
 }
 

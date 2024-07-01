@@ -15,9 +15,8 @@ struct IceSession {
     std::thread         signaling_worker;
 
     AutoJuiceAgent agent;
-    Event          sdp_set_event;
-    Event          gathering_done_event;
-    Event          result_event;
+    Event          event;
+    int            event_kind;
     bool           connected;
     bool           result;
 
