@@ -17,7 +17,6 @@ struct IceSession {
     AutoJuiceAgent agent;
     Event          event;
     int            event_kind;
-    bool           connected;
     bool           result;
 
     virtual auto on_p2p_data(std::span<const std::byte> payload) -> void;

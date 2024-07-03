@@ -8,6 +8,8 @@ namespace {
 struct EventKind {
     enum {
         None = 0,
+        Connected,
+        Disconnected,
         SDPSet,
         GatheringDone,
         Result,
@@ -15,8 +17,9 @@ struct EventKind {
 };
 
 auto set_event(IceSession& session, const int kind) -> void {
+    PRINT("new event: ", kind);
     if(session.event_kind != EventKind::None) {
-        WARN("overwriting previous event");
+        WARN("overwriting previous event: ", session.event_kind);
     }
     session.event_kind = kind;
     session.event.wakeup();
@@ -24,6 +27,7 @@ auto set_event(IceSession& session, const int kind) -> void {
 
 auto wait_for_event(IceSession& session, const int kind) -> bool {
     session.event.wait();
+    session.event.clear();
     return std::exchange(session.event_kind, EventKind::None) == kind;
 }
 
@@ -32,20 +36,15 @@ auto set_result(IceSession& session, const bool result) -> void {
     set_event(session, EventKind::Result);
 }
 
-auto set_connected(IceSession& session, const bool connected) -> void {
-    session.connected = connected;
-    set_result(session, connected);
-}
-
 auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const user_ptr) -> void {
     PRINT("state changed: ", juice_state_to_string(state));
     auto& session = *std::bit_cast<IceSession*>(user_ptr);
     switch(state) {
     case JUICE_STATE_COMPLETED:
-        set_connected(session, true);
+        set_event(session, EventKind::Connected);
         break;
     case JUICE_STATE_FAILED:
-        set_connected(session, false);
+        set_event(session, EventKind::Disconnected);
         session.on_disconnected();
         break;
     default:
@@ -56,14 +55,14 @@ auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state,
 auto on_candidate(juice_agent_t* const /*agent*/, const char* const sdp, void* const user_ptr) -> void {
     PRINT("new candidate: ", sdp);
     auto& session = *std::bit_cast<IceSession*>(user_ptr);
-    set_event(session, EventKind::GatheringDone);
     proto::send_packet(session.websocket_context.wsi, proto::Type::AddCandidates, std::string_view(sdp));
 }
 
 auto on_gathering_done(juice_agent_t* const /*agent*/, void* const user_ptr) -> void {
     PRINT("gathering done");
-    const auto wsi = std::bit_cast<IceSession*>(user_ptr)->websocket_context.wsi;
-    proto::send_packet(wsi, proto::Type::GatheringDone);
+    auto& session = *std::bit_cast<IceSession*>(user_ptr);
+    proto::send_packet(session.websocket_context.wsi, proto::Type::GatheringDone);
+    set_event(session, EventKind::GatheringDone);
 }
 
 auto on_recv(juice_agent_t* const /*agent*/, const char* const data, const size_t size, void* const user_ptr) -> void {
@@ -133,7 +132,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
         while(websocket_context.state == ws::client::State::Connected) {
             websocket_context.process();
         }
-        set_connected(*this, false);
+        set_event(*this, EventKind::Disconnected);
     });
 
     const auto controlled = target_pad_name.empty();
@@ -143,6 +142,8 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     if(!controlled) {
         proto::send_packet(websocket_context.wsi, proto::Type::Link, target_pad_name);
         assert_b(wait_for_success());
+    } else {
+        assert_b(wait_for_success()); // result of LinkAuthResponse
     }
 
     auto config = juice_config_t{
@@ -171,16 +172,12 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
 
     juice_gather_candidates(agent.get());
     assert_b(wait_for_event(*this, EventKind::GatheringDone));
-
-    while(!connected) {
-        assert_b(wait_for_success());
-    }
-
+    assert_b(wait_for_event(*this, EventKind::Connected));
     return true;
 }
 
 auto IceSession::stop() -> void {
-    set_connected(*this, false);
+    set_event(*this, EventKind::Disconnected);
     websocket_context.shutdown();
     if(signaling_worker.joinable()) {
         signaling_worker.join();
@@ -193,7 +190,6 @@ auto IceSession::wait_for_success() -> bool {
 }
 
 auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool {
-    assert_b(connected);
     assert_b(juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0);
     return true;
 }
