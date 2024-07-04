@@ -6,12 +6,16 @@ namespace p2p::proto {
 
 struct Type {
     enum : uint16_t {
-        Success,          // server <-> client
-        Error,            // server <-> cleint
+        Success,
+        Error,
+        // Every packet sent from the client to the server returns a Success or Error packet with the corresponding ID.
+        // The ID of packets sent from the server to the client, excluding result packets, must be ignored
         Register,         // server <-  client  create pad in server
         Unregister,       // server <-  client  delete pad in server
         Link,             // server <-  client  ask server to link self pad to another pad
         Unlink,           // server <-  client  delete link
+        LinkSuccess,      // server  -> client  notify client to linked successfully
+        LinkDenied,       // server  -> client  notify client to link denied
         Unlinked,         // server  -> client  notify client to unlinked by other pad
         LinkAuth,         // server  -> client  ask client to whether a pad is linkable to his
         LinkAuthResponse, // server <-  client  accept pad linking
@@ -29,7 +33,8 @@ struct Type {
 struct Packet {
     uint16_t size; // total size in bytes, including this header
     uint16_t type;
-};
+    uint32_t id;
+} __attribute__((packed));
 
 struct Register : Packet {
     // char name[];

@@ -54,7 +54,7 @@ struct Server {
             return;
         }
         if(pad->linked) {
-            send_packet(pad->linked->wsi, proto::Type::Unlinked);
+            send_packet(pad->linked->wsi, proto::Type::Unlinked, 0);
             pad->linked->linked = nullptr;
         }
         pads.erase(pad->name);
@@ -82,10 +82,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         PRINT("pad ", name, " registerd");
         pad = &server->pads.insert(std::pair{name, Pad{std::string(name), "", wsi, nullptr}}).first->second;
-
-        send_packet(wsi, proto::Type::Success);
-        return true;
-    }
+    } break;
     case proto::Type::Unregister: {
         PRINT("received unregister request");
 
@@ -94,9 +91,6 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         PRINT("unregistering pad ", pad->name);
         server->remove_pad(pad);
         pad = nullptr;
-
-        send_packet(wsi, proto::Type::Success);
-        return true;
     } break;
     case proto::Type::Link: {
         const auto requestee_name = proto::extract_last_string<proto::Link>(payload);
@@ -111,10 +105,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         PRINT("sending auth request from ", pad->name, " to ", requestee_name);
         pad->authenticator_name = requestee.name;
-        send_packet(requestee.wsi, proto::Type::LinkAuth, pad->name);
-
-        // result packet will be sent in LinkAuthResponse
-        return true;
+        send_packet(requestee.wsi, proto::Type::LinkAuth, 0, pad->name);
     } break;
     case proto::Type::Unlink: {
         PRINT("received unlink request");
@@ -123,12 +114,9 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         assert_b(pad->linked != nullptr, estr[Error::NotLinked]);
 
         PRINT("unlinking pad ", pad->name, " and ", pad->linked->name);
-        send_packet(pad->linked->wsi, proto::Type::Unlinked);
+        send_packet(pad->linked->wsi, proto::Type::Unlinked, 0);
         pad->linked->linked = nullptr;
         pad->linked         = nullptr;
-
-        send_packet(wsi, proto::Type::Success);
-        return true;
     } break;
     case proto::Type::LinkAuthResponse: {
         unwrap_pb(packet, proto::extract_payload<proto::LinkAuthResponse>(payload));
@@ -145,16 +133,13 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         pad->authenticator_name.clear();
         if(packet.ok == 0) {
-            send_packet(requester.wsi, proto::Type::Error, "authentication denied");
+            send_packet(requester.wsi, proto::Type::LinkDenied, header.id);
         } else {
             PRINT("linking ", pad->name, " and ", requester.name);
             pad->linked      = &requester;
             requester.linked = pad;
-            send_packet(requester.wsi, proto::Type::Success);
+            send_packet(requester.wsi, proto::Type::LinkSuccess, 0);
         }
-
-        send_packet(wsi, proto::Type::Success);
-        return true;
     } break;
     default: {
         PRINT("received general command ", int(header.type));
@@ -167,6 +152,9 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         return true;
     }
     }
+
+    send_packet(wsi, proto::Type::Success, header.id);
+    return true;
 }
 
 struct SessionDataInitializer : ws::server::SessionDataInitializer {
@@ -203,7 +191,14 @@ auto run() -> bool {
         PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
         if(!session.handle_payload(payload)) {
             WARN("payload handling failed");
-            send_packet(wsi, proto::Type::Error);
+
+            const auto& header_o = proto::extract_header(payload);
+            if(!header_o) {
+                WARN("packet too short");
+                send_packet(wsi, proto::Type::Error, 0);
+            } else {
+                send_packet(wsi, proto::Type::Error, header_o->id);
+            }
         }
     };
     wsctx.session_data_initer.reset(new SessionDataInitializer(server));

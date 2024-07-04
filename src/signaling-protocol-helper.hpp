@@ -61,16 +61,16 @@ inline auto add_parameters(std::vector<std::byte>& buffer, Arg arg, Args... args
 }
 
 template <class... Args>
-inline auto build_packet(uint16_t type, Args... args) -> std::vector<std::byte> {
+inline auto build_packet(uint16_t type, uint32_t id, Args... args) -> std::vector<std::byte> {
     auto buffer = std::vector<std::byte>(sizeof(Packet));
     add_parameters(buffer, args...);
-    *(std::bit_cast<Packet*>(buffer.data())) = Packet{uint16_t(buffer.size()), type};
+    *(std::bit_cast<Packet*>(buffer.data())) = Packet{uint16_t(buffer.size()), type, id};
     return buffer;
 }
 
 template <class... Args>
-inline auto send_packet(lws* wsi, uint16_t type, Args... args) -> void {
-    const auto buffer = build_packet(type, args...);
+inline auto send_packet(lws* wsi, uint16_t type, uint32_t id, Args... args) -> void {
+    const auto buffer = build_packet(type, id, args...);
     ws::write_back(wsi, buffer.data(), buffer.size());
 }
 } // namespace p2p::proto
