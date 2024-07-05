@@ -43,13 +43,13 @@ auto IceSession::on_p2p_connected_state(const bool flag) -> void {
 auto IceSession::on_p2p_new_candidate(const std::string_view sdp) -> void {
     PRINT("new candidate: ", sdp);
     send_packet_relayed_detached(
-        p2p::proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
+        proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
 }
 
 auto IceSession::on_p2p_gathering_done() -> void {
     PRINT("gathering done");
     send_packet_relayed_detached(
-        p2p::proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
+        proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
 }
 
 auto IceSession::add_event_handler(const uint32_t kind, std::function<EventHandler> handler) -> void {
@@ -65,7 +65,7 @@ auto IceSession::is_connected() const -> bool {
 }
 
 auto IceSession::handle_payload(const std::span<const std::byte> payload) -> bool {
-    unwrap_pb(header, p2p::proto::extract_header(payload));
+    unwrap_pb(header, proto::extract_header(payload));
 
     switch(header.type) {
     case proto::Type::Success:
@@ -78,12 +78,12 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
         stop();
         return true;
     case proto::Type::LinkAuth: {
-        const auto requester_name = p2p::proto::extract_last_string<p2p::proto::LinkAuth>(payload);
+        const auto requester_name = proto::extract_last_string<proto::LinkAuth>(payload);
         PRINT("received link request from name: ", requester_name);
         const auto ok = auth_peer(requester_name);
         PRINT(ok ? "accepting peer" : "denying peer");
         send_packet_relayed_detached(
-            p2p::proto::Type::LinkAuthResponse, [this](const uint32_t result) {
+            proto::Type::LinkAuthResponse, [this](const uint32_t result) {
                 events.invoke(EventKind::Linked, no_id, result);
             },
             uint16_t(ok), requester_name);
