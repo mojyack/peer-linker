@@ -64,7 +64,8 @@ class IceSession {
 
     std::atomic_bool disconnected = false;
 
-    auto handle_payload(const std::span<const std::byte> payload) -> bool;
+  protected:
+    virtual auto handle_payload(const std::span<const std::byte> payload) -> bool;
 
   public:
     // internal use
