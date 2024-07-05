@@ -18,6 +18,8 @@ struct EventKind {
         RemoteGatheringDone,
         Result,
         Linked,
+
+        Limit,
     };
 };
 
