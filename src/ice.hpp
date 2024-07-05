@@ -68,6 +68,10 @@ class IceSession {
 
     template <class... Args>
     auto send_packet_relayed(uint16_t type, Args... args) -> bool {
+        if(disconnected) {
+            return false;
+        }
+
         auto event   = Event();
         auto result  = bool();
         auto handler = std::function<EventHandler>([&event, &result](uint32_t value) {
@@ -83,6 +87,10 @@ class IceSession {
 
     template <class... Args>
     auto send_packet_relayed_detached(uint16_t type, std::function<EventHandler> handler, Args... args) -> void {
+        if(disconnected) {
+            return;
+        }
+
         const auto id = packet_id += 1;
         events.add_handler({
             .kind    = EventKind::Result,

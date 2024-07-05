@@ -150,7 +150,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     websocket_context.dump_packets = true;
     assert_b(websocket_context.init(server, port, "/", "message", ws::client::SSLLevel::NoSSL));
     signaling_worker = std::thread([this]() -> void {
-        while(websocket_context.state == ws::client::State::Connected) {
+        while(!disconnected && websocket_context.state == ws::client::State::Connected) {
             websocket_context.process();
         }
         stop();
@@ -212,7 +212,9 @@ auto IceSession::stop() -> void {
         return;
     }
     events.drain();
-    websocket_context.shutdown();
+    if(websocket_context.state == ws::client::State::Connected) {
+        websocket_context.shutdown();
+    }
     on_disconnected();
 }
 
