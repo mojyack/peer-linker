@@ -4,7 +4,7 @@
 #include <juice/juice.h>
 
 #include "signaling-protocol-helper.hpp"
-#include "util/waiters-event.hpp"
+#include "util/event.hpp"
 #include "ws/client.hpp"
 
 namespace p2p::ice {
@@ -14,9 +14,8 @@ struct EventKind {
     enum {
         None = 0,
         Connected,
-        Disconnected,
         SDPSet,
-        GatheringDone,
+        RemoteGatheringDone,
         Result,
         Linked,
     };
@@ -24,7 +23,8 @@ struct EventKind {
 
 using EventHandler = void(uint32_t value);
 
-constexpr auto ignore_id = uint32_t(-1);
+constexpr auto no_id    = uint32_t(-1);
+constexpr auto no_value = uint32_t(-1);
 
 struct IceEventHandlerInfo {
     uint32_t                    kind;
@@ -38,19 +38,13 @@ struct IceEvent {
     uint32_t value;
 };
 
-// there is two ways of handling packet result.
-// 1. use wait_for(kind, id) to block until the desired packet arrived
-// 2. use add_result_handler(info) to register callback
 struct IceEvents {
-    WaitersEvent notifier;
-
     std::mutex                       lock;
-    std::vector<IceEvent>            events;
-    std::vector<IceEventHandlerInfo> result_handlers;
+    std::vector<IceEventHandlerInfo> handlers;
 
-    auto set(uint32_t kind, uint32_t id = 0, uint32_t value = 0) -> void;
-    auto wait_for(uint32_t kind, uint32_t id = ignore_id) -> std::optional<uint32_t>;
-    auto add_result_handler(IceEventHandlerInfo info) -> void;
+    auto invoke(uint32_t kind, uint32_t id, uint32_t value) -> void;
+    auto add_handler(IceEventHandlerInfo info) -> void;
+    auto drain() -> void;
 };
 
 class IceSession {
@@ -68,6 +62,8 @@ class IceSession {
     // packet id for signaling server
     uint32_t packet_id;
 
+    std::atomic_bool disconnected = false;
+
     auto handle_payload(const std::span<const std::byte> payload) -> bool;
 
   public:
@@ -75,6 +71,7 @@ class IceSession {
     auto on_p2p_connected_state(bool flag) -> void;
     auto on_p2p_new_candidate(std::string_view sdp) -> void;
     auto on_p2p_gathering_done() -> void;
+    auto add_event_handler(uint32_t kind, std::function<EventHandler> handler) -> void;
 
     // api
     virtual auto on_p2p_data(std::span<const std::byte> payload) -> void;
@@ -83,20 +80,29 @@ class IceSession {
 
     auto start(const char* server, uint16_t port, std::string_view pad_name, std::string_view target_pad_name, const char* turn_server, uint16_t turn_port) -> bool;
     auto stop() -> void;
-    auto wait_for_success(uint32_t packet_id) -> bool;
     auto send_payload(const std::span<const std::byte> payload) -> bool;
 
+    auto send_result_relayed(bool result, uint16_t packet_id) -> void;
+
     template <class... Args>
-    auto send_packet_relayed(uint16_t type, Args... args) -> uint32_t {
-        const auto id = packet_id += 1;
-        proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
-        return id;
+    auto send_packet_relayed(uint16_t type, Args... args) -> bool {
+        auto event   = Event();
+        auto result  = bool();
+        auto handler = std::function<EventHandler>([&event, &result](uint32_t value) {
+            event.notify();
+            result = bool(value);
+        });
+
+        send_packet_relayed_detached(type, handler, std::forward<Args>(args)...);
+
+        event.wait();
+        return result && !disconnected;
     }
 
     template <class... Args>
     auto send_packet_relayed_detached(uint16_t type, std::function<EventHandler> handler, Args... args) -> void {
         const auto id = packet_id += 1;
-        events.add_result_handler({
+        events.add_handler({
             .kind    = EventKind::Result,
             .id      = id,
             .handler = handler,

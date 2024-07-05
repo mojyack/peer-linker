@@ -32,81 +32,74 @@ auto on_recv(juice_agent_t* const /*agent*/, const char* const data, const size_
 }
 } // namespace
 
-auto IceEvents::set(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
-    PRINT("new event: ", kind);
-    auto info = std::optional<IceEventHandlerInfo>();
+auto IceEvents::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
+    if(id != no_id) {
+        PRINT("new event kind: ", kind, " id: ", id, " value: ", value);
+    } else {
+        PRINT("new event kind: ", kind, " value: ", value);
+    }
+
+    auto found = std::optional<IceEventHandlerInfo>();
     {
         auto guard = std::lock_guard(lock);
-
-        // search from detached result handlers
-        for(auto i = result_handlers.begin(); i < result_handlers.end(); i += 1) {
+        for(auto i = handlers.begin(); i < handlers.end(); i += 1) {
             if(i->kind == kind && i->id == id) {
-                info = std::move(*i);
-                result_handlers.erase(i);
+                found = std::move(*i);
+                handlers.erase(i);
                 break;
             }
         }
-        if(!info) {
-            events.emplace_back(kind, id, value);
-        }
     }
-    if(!info) {
-        if(kind == EventKind::Disconnected) {
-            notifier.drain();
-        } else {
-            notifier.notify();
-        }
-    } else {
-        info->handler(value);
-    }
+    unwrap_on(info, found, "unhandled event");
+    info.handler(value);
 }
 
-auto IceEvents::wait_for(const uint32_t target_kind, const uint32_t target_id) -> std::optional<uint32_t> {
-    auto intent = WaitersEventIntent(notifier);
-    while(true) {
-        {
-            auto guard = std::lock_guard(lock);
-            for(auto i = events.begin(); i != events.end(); i += 1) {
-                if(i->kind == EventKind::Disconnected) {
-                    return std::nullopt;
-                }
-                if(i->kind == target_kind && (target_id == ignore_id || i->id == target_id)) {
-                    const auto value = i->value;
-                    events.erase(i);
-                    return value;
-                }
-            }
-        }
-        notifier.wait();
-    }
-}
-
-auto IceEvents::add_result_handler(IceEventHandlerInfo info) -> void {
+auto IceEvents::add_handler(IceEventHandlerInfo info) -> void {
     auto guard = std::lock_guard(lock);
-    result_handlers.push_back(info);
+    handlers.push_back(info);
+}
+
+auto IceEvents::drain() -> void {
+loop:
+    auto found = std::optional<IceEventHandlerInfo>();
+    {
+        auto guard = std::lock_guard(lock);
+        if(handlers.empty()) {
+            return;
+        }
+        found = std::move(handlers.back());
+        handlers.pop_back();
+    }
+    found->handler(0);
+    goto loop;
 }
 
 auto IceSession::on_p2p_connected_state(const bool flag) -> void {
     if(flag) {
-        events.set(EventKind::Connected);
+        events.invoke(EventKind::Connected, no_id, no_value);
     } else {
-        events.set(EventKind::Disconnected);
-        on_p2p_disconnected();
+        stop();
     }
 }
 
 auto IceSession::on_p2p_new_candidate(const std::string_view sdp) -> void {
     PRINT("new candidate: ", sdp);
-    send_packet_relayed(proto::Type::AddCandidates, std::string_view(sdp));
     send_packet_relayed_detached(
-        p2p::proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "sending new candidates failed"); }, sdp);
+        p2p::proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
 }
 
 auto IceSession::on_p2p_gathering_done() -> void {
     PRINT("gathering done");
-    events.set(EventKind::GatheringDone);
     send_packet_relayed_detached(
-        p2p::proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "sending gathering done failed"); });
+        p2p::proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
+}
+
+auto IceSession::add_event_handler(const uint32_t kind, std::function<EventHandler> handler) -> void {
+    events.add_handler({
+        .kind    = kind,
+        .id      = no_id,
+        .handler = handler,
+    });
 }
 
 auto IceSession::handle_payload(const std::span<const std::byte> payload) -> bool {
@@ -114,13 +107,13 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
 
     switch(header.type) {
     case proto::Type::Success:
-        events.set(EventKind::Result, header.id, 1);
+        events.invoke(EventKind::Result, header.id, 1);
         return true;
     case proto::Type::Error:
-        events.set(EventKind::Result, header.id, 0);
+        events.invoke(EventKind::Result, header.id, 0);
         return true;
     case proto::Type::Unlinked:
-        events.set(EventKind::Disconnected);
+        stop();
         return true;
     case proto::Type::LinkAuth: {
         const auto requester_name = p2p::proto::extract_last_string<p2p::proto::LinkAuth>(payload);
@@ -129,30 +122,25 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
         PRINT(ok ? "accepting peer" : "denying peer");
         send_packet_relayed_detached(
             p2p::proto::Type::LinkAuthResponse, [this](const uint32_t result) {
-                if(result) {
-                    events.set(EventKind::Linked);
-                } else {
-                    WARN("failed to send auth response");
-                    events.set(EventKind::Disconnected);
-                }
+                events.invoke(EventKind::Linked, no_id, result);
             },
             uint16_t(ok), requester_name);
         return true;
     }
     case proto::Type::LinkSuccess:
-        events.set(EventKind::Linked);
+        events.invoke(EventKind::Linked, no_id, 1);
         return true;
     case proto::Type::LinkDenied:
         WARN("pad link authentication denied");
-        events.set(EventKind::Disconnected);
+        stop();
         return true;
     case proto::Type::SetCandidates: {
         const auto sdp = proto::extract_last_string<proto::SetCandidates>(payload);
         PRINT("received remote candidates: ", sdp);
         juice_set_remote_description(agent.get(), sdp.data());
-        events.set(EventKind::SDPSet);
+        events.invoke(EventKind::SDPSet, no_id, no_value);
 
-        send_packet_relayed(proto::Type::Success);
+        send_result_relayed(true, header.id);
         return true;
     }
     case proto::Type::AddCandidates: {
@@ -160,14 +148,15 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
         PRINT("received additional candidates: ", sdp);
         juice_add_remote_candidate(agent.get(), sdp.data());
 
-        send_packet_relayed(proto::Type::Success);
+        send_result_relayed(true, header.id);
         return true;
     }
     case proto::Type::GatheringDone: {
         PRINT("received gathering done");
         juice_set_remote_gathering_done(agent.get());
+        events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
 
-        send_packet_relayed(proto::Type::Success);
+        send_result_relayed(true, header.id);
         return true;
     }
     default:
@@ -202,18 +191,30 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
         while(websocket_context.state == ws::client::State::Connected) {
             websocket_context.process();
         }
-        events.set(EventKind::Disconnected);
+        stop();
     });
 
-    const auto controlled = target_pad_name.empty();
+    auto linked_event         = Event();
+    auto sdp_set_event        = Event();
+    auto gathering_done_event = Event();
+    auto connected_event      = Event();
+    add_event_handler(EventKind::Linked, [this, &linked_event](const uint32_t result) {
+        if(!result) {
+            stop();
+        }
+        linked_event.notify();
+    });
+    add_event_handler(EventKind::SDPSet, [&](uint32_t) { sdp_set_event.notify(); });
+    add_event_handler(EventKind::RemoteGatheringDone, [&](uint32_t) { gathering_done_event.notify(); });
+    add_event_handler(EventKind::Connected, [&](uint32_t) { connected_event.notify(); });
 
-    assert_b(wait_for_success(send_packet_relayed(proto::Type::Register, pad_name)));
+    assert_b(send_packet_relayed(proto::Type::Register, pad_name));
+
+    const auto controlled = target_pad_name.empty();
     if(!controlled) {
-        assert_b(wait_for_success(send_packet_relayed(proto::Type::Link, target_pad_name)));
-        assert_b(events.wait_for(EventKind::Linked));
-    } else {
-        assert_b(events.wait_for(EventKind::Linked));
+        assert_b(send_packet_relayed(proto::Type::Link, target_pad_name));
     }
+    linked_event.wait();
 
     auto config = juice_config_t{
         .stun_server_host  = turn_server,
@@ -230,37 +231,39 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     }
     agent.reset(juice_create(&config));
     if(controlled) {
-        assert_b(events.wait_for(EventKind::SDPSet));
+        sdp_set_event.wait();
     }
 
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
     assert_b(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
     PRINT(pad_name, " sdp: ", sdp.data());
-    assert_b(wait_for_success(send_packet_relayed(proto::Type::SetCandidates, std::string_view(sdp.data()))));
+    assert_b(send_packet_relayed(proto::Type::SetCandidates, std::string_view(sdp.data())));
 
     juice_gather_candidates(agent.get());
-    assert_b(events.wait_for(EventKind::GatheringDone));
-    assert_b(events.wait_for(EventKind::Connected));
+    gathering_done_event.wait();
+    connected_event.wait();
     return true;
 }
 
 auto IceSession::stop() -> void {
-    events.set(EventKind::Disconnected);
+    if(disconnected.exchange(true)) {
+        return;
+    }
     websocket_context.shutdown();
-    events.notifier.drain();
     if(signaling_worker.joinable()) {
         signaling_worker.join();
     }
-}
-
-auto IceSession::wait_for_success(const uint32_t packet_id) -> bool {
-    unwrap_ob(result, events.wait_for(EventKind::Result, packet_id));
-    return bool(result);
+    events.drain();
 }
 
 auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool {
     assert_b(juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0);
     return true;
+}
+
+auto IceSession::send_result_relayed(const bool result, const uint16_t packet_id) -> void {
+    const auto type = result ? proto::Type::Success : proto::Type::Error;
+    proto::send_packet(websocket_context.wsi, type, packet_id);
 }
 
 IceSession::~IceSession() {
