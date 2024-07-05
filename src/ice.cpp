@@ -60,6 +60,10 @@ auto IceSession::add_event_handler(const uint32_t kind, std::function<EventHandl
     });
 }
 
+auto IceSession::is_connected() const -> bool {
+    return !disconnected;
+}
+
 auto IceSession::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, p2p::proto::extract_header(payload));
 

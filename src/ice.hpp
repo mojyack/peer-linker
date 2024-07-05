@@ -33,15 +33,16 @@ class IceSession {
     // connection to another peer
     AutoJuiceAgent agent;
 
-    // event handling
-    IceEvents events;
-
     // packet id for signaling server
     uint32_t packet_id;
 
     std::atomic_bool disconnected = false;
 
   protected:
+    IceEvents events;
+
+    auto is_connected() const -> bool;
+
     virtual auto handle_payload(const std::span<const std::byte> payload) -> bool;
 
   public:
