@@ -64,6 +64,10 @@ auto IceSession::is_connected() const -> bool {
     return !disconnected;
 }
 
+auto IceSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
+    return false;
+}
+
 auto IceSession::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, proto::extract_header(payload));
 
@@ -133,10 +137,6 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
 
 auto IceSession::on_disconnected() -> void {
     PRINT("session disconnected");
-}
-
-auto IceSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
-    return false;
 }
 
 auto IceSession::start(const char* const server, const uint16_t port, const std::string_view pad_name, const std::string_view target_pad_name, const char* turn_server, uint16_t turn_port) -> bool {
