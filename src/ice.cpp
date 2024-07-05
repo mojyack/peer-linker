@@ -211,11 +211,8 @@ auto IceSession::stop() -> void {
     if(disconnected.exchange(true)) {
         return;
     }
-    websocket_context.shutdown();
-    if(signaling_worker.joinable()) {
-        signaling_worker.join();
-    }
     events.drain();
+    websocket_context.shutdown();
     on_disconnected();
 }
 
@@ -231,5 +228,8 @@ auto IceSession::send_result_relayed(const bool result, const uint16_t packet_id
 
 IceSession::~IceSession() {
     stop();
+    if(signaling_worker.joinable()) {
+        signaling_worker.join();
+    }
 }
 } // namespace p2p::ice
