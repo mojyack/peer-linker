@@ -75,14 +75,17 @@ class IceSession {
     auto add_event_handler(uint32_t kind, std::function<EventHandler> handler) -> void;
 
     // api
-    virtual auto on_p2p_data(std::span<const std::byte> payload) -> void;
+    virtual auto on_p2p_packet_received(std::span<const std::byte> payload) -> void;
     virtual auto on_p2p_disconnected() -> void;
     virtual auto auth_peer(std::string_view peer_name) -> bool;
 
     auto start(const char* server, uint16_t port, std::string_view pad_name, std::string_view target_pad_name, const char* turn_server, uint16_t turn_port) -> bool;
     auto stop() -> void;
-    auto send_payload(const std::span<const std::byte> payload) -> bool;
 
+    // to p2p peer
+    auto send_packet_p2p(const std::span<const std::byte> payload) -> bool;
+
+    // to signaling server
     auto send_result_relayed(bool result, uint16_t packet_id) -> void;
 
     template <class... Args>

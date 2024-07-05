@@ -28,7 +28,7 @@ auto on_gathering_done(juice_agent_t* const /*agent*/, void* const user_ptr) -> 
 }
 
 auto on_recv(juice_agent_t* const /*agent*/, const char* const data, const size_t size, void* const user_ptr) -> void {
-    std::bit_cast<IceSession*>(user_ptr)->on_p2p_data({(std::byte*)data, size});
+    std::bit_cast<IceSession*>(user_ptr)->on_p2p_packet_received({(std::byte*)data, size});
 }
 } // namespace
 
@@ -165,7 +165,7 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
     }
 }
 
-auto IceSession::on_p2p_data(const std::span<const std::byte> payload) -> void {
+auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload) -> void {
     PRINT("p2p data received: ", payload.size(), " bytes");
 }
 
@@ -256,7 +256,7 @@ auto IceSession::stop() -> void {
     events.drain();
 }
 
-auto IceSession::send_payload(const std::span<const std::byte> payload) -> bool {
+auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {
     assert_b(juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0);
     return true;
 }
