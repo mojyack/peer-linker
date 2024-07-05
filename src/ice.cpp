@@ -131,7 +131,7 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
     PRINT("p2p data received: ", payload.size(), " bytes");
 }
 
-auto IceSession::on_p2p_disconnected() -> void {
+auto IceSession::on_disconnected() -> void {
     PRINT("session disconnected");
 }
 
@@ -216,6 +216,7 @@ auto IceSession::stop() -> void {
         signaling_worker.join();
     }
     events.drain();
+    on_disconnected();
 }
 
 auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {

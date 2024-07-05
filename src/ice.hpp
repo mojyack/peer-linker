@@ -54,7 +54,7 @@ class IceSession {
 
     // api
     virtual auto on_p2p_packet_received(std::span<const std::byte> payload) -> void;
-    virtual auto on_p2p_disconnected() -> void;
+    virtual auto on_disconnected() -> void;
     virtual auto auth_peer(std::string_view peer_name) -> bool;
 
     auto start(const char* server, uint16_t port, std::string_view pad_name, std::string_view target_pad_name, const char* turn_server, uint16_t turn_port) -> bool;
