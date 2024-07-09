@@ -145,7 +145,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
         PRINT("received ", payload.size(), " bytes");
         if(!handle_payload(payload)) {
             WARN("payload handling failed");
-            send_packet_relayed(plink::proto::Type::Error);
+            send_packet_relayed(plink::proto::Type::Error); // TODO: set correct packet id
         }
     };
     websocket_context.dump_packets = true;
