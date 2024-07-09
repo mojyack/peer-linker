@@ -1,5 +1,6 @@
 #include "ice.hpp"
 #include "macros/unwrap.hpp"
+#include "peer-linker-protocol.hpp"
 #include "util/assert.hpp"
 
 namespace p2p::ice {

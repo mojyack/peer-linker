@@ -1,4 +1,5 @@
 #include "macros/unwrap.hpp"
+#include "peer-linker-protocol.hpp"
 #include "protocol-helper.hpp"
 #include "util/assert.hpp"
 #include "util/string-map.hpp"

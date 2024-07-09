@@ -2,7 +2,7 @@
 #include <cstring>
 #include <string_view>
 
-#include "peer-linker-protocol.hpp"
+#include "protocol.hpp"
 #include "ws/impl.hpp"
 #include "ws/misc.hpp"
 

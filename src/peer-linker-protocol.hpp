@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "protocol.hpp"
 
 namespace p2p::proto {
 // client <-> (pad: server :pad) <-> client
@@ -29,12 +29,6 @@ struct Type {
         Limit,
     };
 };
-
-struct Packet {
-    uint16_t size; // total size in bytes, including this header
-    uint16_t type;
-    uint32_t id;
-} __attribute__((packed));
 
 struct Register : Packet {
     // char name[];
