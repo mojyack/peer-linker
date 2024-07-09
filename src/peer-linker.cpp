@@ -55,7 +55,7 @@ struct Server {
             return;
         }
         if(pad->linked) {
-            send_packet(pad->linked->wsi, proto::Type::Unlinked, 0);
+            proto::send_packet(pad->linked->wsi, plink::proto::Type::Unlinked, 0);
             pad->linked->linked = nullptr;
         }
         pads.erase(pad->name);
@@ -73,8 +73,8 @@ struct Session {
 auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, proto::extract_header(payload));
     switch(header.type) {
-    case proto::Type::Register: {
-        const auto name = proto::extract_last_string<proto::Register>(payload);
+    case plink::proto::Type::Register: {
+        const auto name = proto::extract_last_string<plink::proto::Register>(payload);
         PRINT("received pad register request name:", name);
 
         assert_b(!name.empty(), estr[Error::EmptyPadName]);
@@ -84,7 +84,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         PRINT("pad ", name, " registerd");
         pad = &server->pads.insert(std::pair{name, Pad{std::string(name), "", wsi, nullptr}}).first->second;
     } break;
-    case proto::Type::Unregister: {
+    case plink::proto::Type::Unregister: {
         PRINT("received unregister request");
 
         assert_b(pad != nullptr, estr[Error::NotRegistered]);
@@ -93,8 +93,8 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         server->remove_pad(pad);
         pad = nullptr;
     } break;
-    case proto::Type::Link: {
-        const auto requestee_name = proto::extract_last_string<proto::Link>(payload);
+    case plink::proto::Type::Link: {
+        const auto requestee_name = proto::extract_last_string<plink::proto::Link>(payload);
         PRINT("received pad link request to ", requestee_name);
 
         assert_b(pad != nullptr, estr[Error::NotRegistered]);
@@ -106,22 +106,22 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         PRINT("sending auth request from ", pad->name, " to ", requestee_name);
         pad->authenticator_name = requestee.name;
-        send_packet(requestee.wsi, proto::Type::LinkAuth, 0, pad->name);
+        proto::send_packet(requestee.wsi, plink::proto::Type::LinkAuth, 0, pad->name);
     } break;
-    case proto::Type::Unlink: {
+    case plink::proto::Type::Unlink: {
         PRINT("received unlink request");
 
         assert_b(pad != nullptr, estr[Error::NotRegistered]);
         assert_b(pad->linked != nullptr, estr[Error::NotLinked]);
 
         PRINT("unlinking pad ", pad->name, " and ", pad->linked->name);
-        send_packet(pad->linked->wsi, proto::Type::Unlinked, 0);
+        proto::send_packet(pad->linked->wsi, plink::proto::Type::Unlinked, 0);
         pad->linked->linked = nullptr;
         pad->linked         = nullptr;
     } break;
-    case proto::Type::LinkAuthResponse: {
-        unwrap_pb(packet, proto::extract_payload<proto::LinkAuthResponse>(payload));
-        const auto requester_name = proto::extract_last_string<proto::LinkAuthResponse>(payload);
+    case plink::proto::Type::LinkAuthResponse: {
+        unwrap_pb(packet, proto::extract_payload<plink::proto::LinkAuthResponse>(payload));
+        const auto requester_name = proto::extract_last_string<plink::proto::LinkAuthResponse>(payload);
         PRINT("received link auth to name: ", requester_name, " ok: ", int(packet.ok));
 
         assert_b(pad != nullptr, estr[Error::NotRegistered]);
@@ -134,12 +134,12 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         pad->authenticator_name.clear();
         if(packet.ok == 0) {
-            send_packet(requester.wsi, proto::Type::LinkDenied, header.id);
+            proto::send_packet(requester.wsi, plink::proto::Type::LinkDenied, header.id);
         } else {
             PRINT("linking ", pad->name, " and ", requester.name);
             pad->linked      = &requester;
             requester.linked = pad;
-            send_packet(requester.wsi, proto::Type::LinkSuccess, 0);
+            proto::send_packet(requester.wsi, plink::proto::Type::LinkSuccess, 0);
         }
     } break;
     default: {
@@ -154,7 +154,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
     }
     }
 
-    send_packet(wsi, proto::Type::Success, header.id);
+    proto::send_packet(wsi, plink::proto::Type::Success, header.id);
     return true;
 }
 
@@ -196,9 +196,9 @@ auto run() -> bool {
             const auto& header_o = proto::extract_header(payload);
             if(!header_o) {
                 WARN("packet too short");
-                send_packet(wsi, proto::Type::Error, 0);
+                proto::send_packet(wsi, plink::proto::Type::Error, 0);
             } else {
-                send_packet(wsi, proto::Type::Error, header_o->id);
+                proto::send_packet(wsi, plink::proto::Type::Error, header_o->id);
             }
         }
     };

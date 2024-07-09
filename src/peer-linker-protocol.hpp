@@ -1,7 +1,7 @@
 #pragma once
 #include "protocol.hpp"
 
-namespace p2p::proto {
+namespace p2p::plink::proto {
 // client <-> (pad: server :pad) <-> client
 
 struct Type {
@@ -30,34 +30,34 @@ struct Type {
     };
 };
 
-struct Register : Packet {
+struct Register : ::p2p::proto::Packet {
     // char name[];
 };
 
-struct Link : Packet {
+struct Link : ::p2p::proto::Packet {
     // char target_name[];
 };
 
-struct Unlink : Packet {
+struct Unlink : ::p2p::proto::Packet {
 };
 
-struct LinkAuth : Packet {
+struct LinkAuth : ::p2p::proto::Packet {
     // char requestee_name[];
 };
 
-struct LinkAuthResponse : Packet {
+struct LinkAuthResponse : ::p2p::proto::Packet {
     uint16_t ok;
     // char requester_name[];
 };
 
-struct SetCandidates : Packet {
+struct SetCandidates : ::p2p::proto::Packet {
     // char sdp[];
 };
 
-struct AddCandidates : Packet {
+struct AddCandidates : ::p2p::proto::Packet {
     // char sdp[];
 };
 
-struct GatheringDone : Packet {
+struct GatheringDone : ::p2p::proto::Packet {
 };
-} // namespace p2p::proto
+} // namespace p2p::plink::proto

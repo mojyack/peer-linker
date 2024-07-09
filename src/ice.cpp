@@ -44,13 +44,13 @@ auto IceSession::on_p2p_connected_state(const bool flag) -> void {
 auto IceSession::on_p2p_new_candidate(const std::string_view sdp) -> void {
     PRINT("new candidate: ", sdp);
     send_packet_relayed_detached(
-        proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
+        plink::proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
 }
 
 auto IceSession::on_p2p_gathering_done() -> void {
     PRINT("gathering done");
     send_packet_relayed_detached(
-        proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
+        plink::proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
 }
 
 auto IceSession::add_event_handler(const uint32_t kind, std::function<EventHandler> handler) -> void {
@@ -73,36 +73,36 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
     unwrap_pb(header, proto::extract_header(payload));
 
     switch(header.type) {
-    case proto::Type::Success:
+    case plink::proto::Type::Success:
         events.invoke(EventKind::Result, header.id, 1);
         return true;
-    case proto::Type::Error:
+    case plink::proto::Type::Error:
         events.invoke(EventKind::Result, header.id, 0);
         return true;
-    case proto::Type::Unlinked:
+    case plink::proto::Type::Unlinked:
         stop();
         return true;
-    case proto::Type::LinkAuth: {
-        const auto requester_name = proto::extract_last_string<proto::LinkAuth>(payload);
+    case plink::proto::Type::LinkAuth: {
+        const auto requester_name = proto::extract_last_string<plink::proto::LinkAuth>(payload);
         PRINT("received link request from name: ", requester_name);
         const auto ok = auth_peer(requester_name);
         PRINT(ok ? "accepting peer" : "denying peer");
         send_packet_relayed_detached(
-            proto::Type::LinkAuthResponse, [this](const uint32_t result) {
+            plink::proto::Type::LinkAuthResponse, [this](const uint32_t result) {
                 events.invoke(EventKind::Linked, no_id, result);
             },
             uint16_t(ok), requester_name);
         return true;
     }
-    case proto::Type::LinkSuccess:
+    case plink::proto::Type::LinkSuccess:
         events.invoke(EventKind::Linked, no_id, 1);
         return true;
-    case proto::Type::LinkDenied:
+    case plink::proto::Type::LinkDenied:
         WARN("pad link authentication denied");
         stop();
         return true;
-    case proto::Type::SetCandidates: {
-        const auto sdp = proto::extract_last_string<proto::SetCandidates>(payload);
+    case plink::proto::Type::SetCandidates: {
+        const auto sdp = proto::extract_last_string<plink::proto::SetCandidates>(payload);
         PRINT("received remote candidates: ", sdp);
         juice_set_remote_description(agent.get(), sdp.data());
         events.invoke(EventKind::SDPSet, no_id, no_value);
@@ -110,15 +110,15 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
         send_result_relayed(true, header.id);
         return true;
     }
-    case proto::Type::AddCandidates: {
-        const auto sdp = proto::extract_last_string<proto::AddCandidates>(payload);
+    case plink::proto::Type::AddCandidates: {
+        const auto sdp = proto::extract_last_string<plink::proto::AddCandidates>(payload);
         PRINT("received additional candidates: ", sdp);
         juice_add_remote_candidate(agent.get(), sdp.data());
 
         send_result_relayed(true, header.id);
         return true;
     }
-    case proto::Type::GatheringDone: {
+    case plink::proto::Type::GatheringDone: {
         PRINT("received gathering done");
         juice_set_remote_gathering_done(agent.get());
         events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
@@ -145,7 +145,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
         PRINT("received ", payload.size(), " bytes");
         if(!handle_payload(payload)) {
             WARN("payload handling failed");
-            send_packet_relayed(proto::Type::Error);
+            send_packet_relayed(plink::proto::Type::Error);
         }
     };
     websocket_context.dump_packets = true;
@@ -171,11 +171,11 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     add_event_handler(EventKind::RemoteGatheringDone, [&](uint32_t) { gathering_done_event.notify(); });
     add_event_handler(EventKind::Connected, [&](uint32_t) { connected_event.notify(); });
 
-    assert_b(send_packet_relayed(proto::Type::Register, pad_name));
+    assert_b(send_packet_relayed(plink::proto::Type::Register, pad_name));
 
     const auto controlled = target_pad_name.empty();
     if(!controlled) {
-        assert_b(send_packet_relayed(proto::Type::Link, target_pad_name));
+        assert_b(send_packet_relayed(plink::proto::Type::Link, target_pad_name));
     }
     linked_event.wait();
 
@@ -200,7 +200,7 @@ auto IceSession::start(const char* const server, const uint16_t port, const std:
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
     assert_b(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
     PRINT(pad_name, " sdp: ", sdp.data());
-    assert_b(send_packet_relayed(proto::Type::SetCandidates, std::string_view(sdp.data())));
+    assert_b(send_packet_relayed(plink::proto::Type::SetCandidates, std::string_view(sdp.data())));
 
     juice_gather_candidates(agent.get());
     gathering_done_event.wait();
@@ -225,7 +225,7 @@ auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bo
 }
 
 auto IceSession::send_result_relayed(const bool result, const uint16_t packet_id) -> void {
-    const auto type = result ? proto::Type::Success : proto::Type::Error;
+    const auto type = result ? plink::proto::Type::Success : plink::proto::Type::Error;
     proto::send_packet(websocket_context.wsi, type, packet_id);
 }
 
