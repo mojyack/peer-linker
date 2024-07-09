@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "event-manager.hpp"
 #include "macros/unwrap.hpp"
 #include "util/assert.hpp"

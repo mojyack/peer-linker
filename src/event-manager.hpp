@@ -1,5 +1,7 @@
 #pragma once
+#include <cstdint>
 #include <functional>
+#include <mutex>
 #include <vector>
 
 namespace p2p::ice {
