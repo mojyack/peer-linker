@@ -205,7 +205,7 @@ auto run() -> bool {
     wsctx.session_data_initer.reset(new SessionDataInitializer(server));
     wsctx.verbose      = true;
     wsctx.dump_packets = true;
-    assert_b(wsctx.init(8080, "message"));
+    assert_b(wsctx.init(8080, "peer-linker"));
     while(wsctx.state == ws::server::State::Connected) {
         wsctx.process();
     }
