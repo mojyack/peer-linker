@@ -39,7 +39,7 @@ class IceSession {
     std::atomic_bool disconnected = false;
 
   protected:
-    IceEvents events;
+    Events events;
 
     auto is_connected() const -> bool;
 

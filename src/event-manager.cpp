@@ -4,15 +4,15 @@
 #include "macros/unwrap.hpp"
 #include "util/assert.hpp"
 
-namespace p2p::ice {
-auto IceEvents::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
+namespace p2p {
+auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
     if(id != no_id) {
         PRINT("new event kind: ", kind, " id: ", id, " value: ", value);
     } else {
         PRINT("new event kind: ", kind, " value: ", value);
     }
 
-    auto found = std::optional<IceEventHandlerInfo>();
+    auto found = std::optional<EventHandlerInfo>();
     {
         auto guard = std::lock_guard(lock);
         for(auto i = handlers.begin(); i < handlers.end(); i += 1) {
@@ -27,14 +27,14 @@ auto IceEvents::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -
     info.handler(value);
 }
 
-auto IceEvents::add_handler(IceEventHandlerInfo info) -> void {
+auto Events::add_handler(EventHandlerInfo info) -> void {
     auto guard = std::lock_guard(lock);
     handlers.push_back(info);
 }
 
-auto IceEvents::drain() -> void {
+auto Events::drain() -> void {
 loop:
-    auto found = std::optional<IceEventHandlerInfo>();
+    auto found = std::optional<EventHandlerInfo>();
     {
         auto guard = std::lock_guard(lock);
         if(handlers.empty()) {
@@ -46,4 +46,4 @@ loop:
     found->handler(0);
     goto loop;
 }
-} // namespace p2p::ice
+} // namespace p2p
