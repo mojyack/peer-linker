@@ -2,7 +2,7 @@
 #include <cstring>
 #include <string_view>
 
-#include "signaling-protocol.hpp"
+#include "peer-linker-protocol.hpp"
 #include "ws/impl.hpp"
 #include "ws/misc.hpp"
 

@@ -4,12 +4,12 @@ add_project_arguments('-Wno-missing-field-initializers', language: 'cpp')
 
 subdir('src')
 
-server_files = files('src/server.cpp') + ws_files + ws_server_files
+peer_linker_files = files('src/peer-linker.cpp') + ws_files + ws_server_files
 
 client_files = files(
   'example/client.cpp',
 ) + p2p_files
 
 
-executable('server', server_files, dependencies : ws_deps)
+executable('peer-linker', peer_linker_files, dependencies : ws_deps)
 executable('client', client_files, dependencies : p2p_deps)

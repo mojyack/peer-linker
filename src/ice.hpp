@@ -4,7 +4,7 @@
 #include <juice/juice.h>
 
 #include "event-manager.hpp"
-#include "signaling-protocol-helper.hpp"
+#include "protocol-helper.hpp"
 #include "util/event.hpp"
 #include "ws/client.hpp"
 
