@@ -109,7 +109,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         const auto id = server->packet_id += 1;
         server->pending_sessions.insert({id, this});
-        p2p::proto::send_packet(channel.wsi, proto::Type::PadRequest, id, payload);
+        p2p::proto::send_packet(channel.wsi, proto::Type::PadRequest, id, name);
     } break;
     case proto::Type::PadRequestResponse: {
         PRINT("received pad request response");
