@@ -37,6 +37,10 @@ auto IceSession::get_error_packet_type() const -> uint16_t {
     return plink::proto::Type::Error;
 }
 
+auto IceSession::on_pad_created() -> void {
+    PRINT("pad created");
+}
+
 auto IceSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
     return false;
 }
@@ -146,6 +150,7 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
     add_event_handler(EventKind::Connected, [&](uint32_t) { connected_event.notify(); });
 
     assert_b(send_packet(plink::proto::Type::Register, pad_name));
+    on_pad_created();
 
     const auto controlled = target_pad_name.empty();
     if(!controlled) {

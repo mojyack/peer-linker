@@ -24,6 +24,7 @@ class IceSession : public wss::WebSocketSession {
     auto get_error_packet_type() const -> uint16_t override;
 
   protected:
+    virtual auto on_pad_created() -> void;
     virtual auto auth_peer(std::string_view peer_name) -> bool;
     virtual auto on_packet_received(std::span<const std::byte> payload) -> bool override;
 
