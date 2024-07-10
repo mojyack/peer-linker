@@ -8,7 +8,7 @@ peer_linker_files = files('src/peer-linker.cpp') + ws_files + ws_server_files
 channel_hub_files = files('src/channel-hub.cpp') + ws_files + ws_server_files
 
 client_files = files(
-  'example/client.cpp',
+  'example/peer-linker-test.cpp',
 ) + p2p_client_ice_files
 
 
@@ -18,5 +18,5 @@ chub_client_test_files = files(
 
 executable('peer-linker', peer_linker_files, dependencies : ws_deps)
 executable('channel-hub', channel_hub_files, dependencies : ws_deps)
-executable('client', client_files, dependencies : p2p_client_ice_deps)
+executable('peer-linker-test', client_files, dependencies : p2p_client_ice_deps)
 executable('channel-hub-client-test', chub_client_test_files, dependencies : p2p_client_chub_deps)
