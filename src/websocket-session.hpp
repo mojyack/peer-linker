@@ -28,10 +28,13 @@ class WebSocketSession {
 
     std::atomic_bool disconnected = false;
 
+    auto handle_raw_packet(std::span<const std::byte> payload) -> void;
+
   protected:
     Events events;
 
-    virtual auto on_packet_received(std::span<const std::byte> payload) -> void = 0;
+    virtual auto get_error_packet_type() const -> uint16_t                      = 0;
+    virtual auto on_packet_received(std::span<const std::byte> payload) -> bool = 0;
     virtual auto on_disconnected() -> void;
 
     auto is_connected() const -> bool;
@@ -40,6 +43,10 @@ class WebSocketSession {
   public:
     auto start(ServerLocation server, std::string protocol) -> bool;
     auto stop() -> void;
+
+    auto allocate_packet_id() -> uint32_t {
+        return packet_id += 1;
+    }
 
     template <class... Args>
     auto send_packet(uint16_t type, Args... args) -> bool {
@@ -66,7 +73,7 @@ class WebSocketSession {
             return;
         }
 
-        const auto id = packet_id += 1;
+        const auto id = allocate_packet_id();
         events.add_handler({
             .kind    = EventKind::Result,
             .id      = id,
@@ -75,8 +82,14 @@ class WebSocketSession {
         proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
     }
 
-    auto send_result(uint16_t type, uint16_t id) -> void {
-        proto::send_packet(websocket_context.wsi, type, id);
+    template <class... Args>
+    auto send_result(uint16_t type, uint16_t id, Args... args) -> void {
+        proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
+    }
+
+    template <class... Args>
+    auto send_generic_packet(uint16_t type, uint16_t id, Args... args) -> void {
+        proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
     }
 
     virtual ~WebSocketSession();

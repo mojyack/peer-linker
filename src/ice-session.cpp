@@ -33,7 +33,15 @@ auto on_recv(juice_agent_t* const /*agent*/, const char* const data, const size_
 }
 } // namespace
 
-auto IceSession::handle_payload(const std::span<const std::byte> payload) -> bool {
+auto IceSession::get_error_packet_type() const -> uint16_t {
+    return plink::proto::Type::Error;
+}
+
+auto IceSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
+    return false;
+}
+
+auto IceSession::on_packet_received(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, proto::extract_header(payload));
 
     switch(header.type) {
@@ -93,24 +101,6 @@ auto IceSession::handle_payload(const std::span<const std::byte> payload) -> boo
     default:
         WARN("unhandled payload type ", int(header.type));
         return false;
-    }
-}
-
-auto IceSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
-    return false;
-}
-
-auto IceSession::on_packet_received(const std::span<const std::byte> payload) -> void {
-    if(!handle_payload(payload)) {
-        WARN("payload handling failed");
-
-        const auto& header_o = p2p::proto::extract_header(payload);
-        if(!header_o) {
-            WARN("packet too short");
-            send_result(plink::proto::Type::Error, 0);
-        } else {
-            send_result(plink::proto::Type::Error, header_o->id);
-        }
     }
 }
 

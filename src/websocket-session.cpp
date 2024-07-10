@@ -3,6 +3,20 @@
 #include "util/assert.hpp"
 
 namespace p2p::wss {
+auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> void {
+    if(!on_packet_received(payload)) {
+        WARN("payload handling failed");
+
+        const auto& header_o = p2p::proto::extract_header(payload);
+        if(!header_o) {
+            WARN("packet too short");
+            send_result(get_error_packet_type(), 0);
+        } else {
+            send_result(get_error_packet_type(), header_o->id);
+        }
+    }
+}
+
 auto WebSocketSession::on_disconnected() -> void {
     PRINT("session disconnected");
 }

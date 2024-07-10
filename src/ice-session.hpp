@@ -21,11 +21,11 @@ class IceSession : public wss::WebSocketSession {
   private:
     AutoJuiceAgent agent;
 
-    auto handle_payload(const std::span<const std::byte> payload) -> bool;
+    auto get_error_packet_type() const -> uint16_t override;
 
   protected:
     virtual auto auth_peer(std::string_view peer_name) -> bool;
-    virtual auto on_packet_received(std::span<const std::byte> payload) -> void override;
+    virtual auto on_packet_received(std::span<const std::byte> payload) -> bool override;
 
   public:
     // internal use
