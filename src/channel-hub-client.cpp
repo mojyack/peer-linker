@@ -37,7 +37,8 @@ auto ChannelHubSender::on_packet_received(const std::span<const std::byte> paylo
         return true;
     case chub::proto::Type::PadRequest: {
         const auto channel_name = ::p2p::proto::extract_last_string<chub::proto::PadRequest>(payload);
-        on_pad_request(header.id, channel_name);
+        assert_b(on_pad_request(header.id, channel_name));
+        send_result(proto::Type::Success, header.id);
         return true;
     }
     default:

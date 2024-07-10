@@ -15,7 +15,7 @@ class ChannelHubSender : public ChannelHubSession {
     auto on_packet_received(std::span<const std::byte> payload) -> bool override;
 
   public:
-    virtual auto on_pad_request(uint16_t request_id, const std::string_view channel_name) -> void = 0;
+    virtual auto on_pad_request(uint16_t request_id, const std::string_view channel_name) -> bool = 0;
 
     auto register_channel(std::string_view name) -> bool;
     auto unregister_channel(std::string_view name) -> bool;
