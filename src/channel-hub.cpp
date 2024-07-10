@@ -124,6 +124,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         PRINT("sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
         p2p::proto::send_packet(requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name);
+        return true;
     } break;
     default: {
         WARN("unknown command ", int(header.type));
