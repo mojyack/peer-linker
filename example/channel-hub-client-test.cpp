@@ -7,8 +7,9 @@ class ChannelHubSender : public p2p::chub::ChannelHubSender {
   private:
     int pad_id = 0;
 
-    auto on_pad_request(const uint16_t request_id, const std::string_view channel_name) -> void override {
+    auto on_pad_request(const uint16_t request_id, const std::string_view channel_name) -> bool override {
         notify_pad_created(request_id, build_string(channel_name, "_pad-", pad_id += 1));
+        return true;
     }
 
   public:
