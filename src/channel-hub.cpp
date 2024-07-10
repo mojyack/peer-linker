@@ -188,7 +188,7 @@ auto run() -> bool {
     wsctx.session_data_initer.reset(new SessionDataInitializer(server));
     wsctx.verbose      = true;
     wsctx.dump_packets = true;
-    assert_b(wsctx.init(8080, "channel-hub"));
+    assert_b(wsctx.init(8081, "channel-hub"));
     while(wsctx.state == ws::server::State::Connected) {
         wsctx.process();
     }

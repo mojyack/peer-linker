@@ -15,7 +15,7 @@ class ChannelHubSender : public p2p::chub::ChannelHubSender {
 };
 
 auto run() -> bool {
-    const auto channel_hub = p2p::wss::ServerLocation{"localhost", 8080};
+    const auto channel_hub = p2p::wss::ServerLocation{"localhost", 8081};
 
     auto sender   = ChannelHubSender();
     auto receiver = p2p::chub::ChannelHubReceiver();
