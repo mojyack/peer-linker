@@ -1,4 +1,6 @@
 #pragma once
+#include <optional>
+
 #include "websocket-session.hpp"
 
 namespace p2p::chub {
