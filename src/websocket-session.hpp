@@ -24,7 +24,7 @@ class WebSocketSession {
   private:
     ws::client::Context websocket_context;
     std::thread         signaling_worker;
-    uint32_t            packet_id;
+    uint32_t            packet_id = 0;
 
     std::atomic_bool disconnected = false;
 
