@@ -39,8 +39,9 @@ auto ChannelHubSender::on_packet_received(const std::span<const std::byte> paylo
         return true;
     case proto::Type::PadRequest: {
         const auto channel_name = ::p2p::proto::extract_last_string<proto::PadRequest>(payload);
-        assert_b(on_pad_request(header.id, channel_name));
-        send_result(proto::Type::Success, header.id);
+        if(!on_pad_request(header.id, channel_name)) {
+            notify_pad_not_created(header.id);
+        }
         return true;
     }
     default:
@@ -60,11 +61,21 @@ auto ChannelHubSender::unregister_channel(const std::string_view name) -> bool {
 }
 
 auto ChannelHubSender::notify_pad_created(const uint16_t request_id, const std::string_view pad_name) -> void {
-    send_result(proto::Type::PadRequestResponse, request_id, uint16_t(1), pad_name);
+    events.add_handler({
+        .kind    = wss::EventKind::Result,
+        .id      = request_id,
+        .handler = [](const uint32_t result) { assert_n(result, "failed to send pad request response"); },
+    });
+    send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(1), pad_name);
 }
 
 auto ChannelHubSender::notify_pad_not_created(const uint16_t request_id) -> void {
-    send_result(proto::Type::PadRequestResponse, request_id, uint16_t(0));
+    events.add_handler({
+        .kind    = wss::EventKind::Result,
+        .id      = request_id,
+        .handler = [](const uint32_t result) { assert_n(result, "failed to send pad request response"); },
+    });
+    send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(0));
 }
 
 // ChannelHubReceiver
