@@ -35,7 +35,6 @@ auto WebSocketSession::add_event_handler(const uint32_t kind, std::function<Even
 
 auto WebSocketSession::start(const ServerLocation server, std::string protocol) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
-        assert_n(!disconnected);
         PRINT("received ", payload.size(), " bytes");
         on_packet_received(payload);
     };
