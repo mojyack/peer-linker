@@ -33,6 +33,13 @@ auto WebSocketSession::add_event_handler(const uint32_t kind, std::function<Even
     });
 }
 
+auto WebSocketSession::destroy() -> void {
+    stop();
+    if(signaling_worker.joinable()) {
+        signaling_worker.join();
+    }
+}
+
 auto WebSocketSession::start(const ServerLocation server, std::string protocol) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
         PRINT("received ", payload.size(), " bytes");
@@ -59,12 +66,5 @@ auto WebSocketSession::stop() -> void {
         websocket_context.shutdown();
     }
     on_disconnected();
-}
-
-WebSocketSession::~WebSocketSession() {
-    stop();
-    if(signaling_worker.joinable()) {
-        signaling_worker.join();
-    }
 }
 } // namespace p2p::wss

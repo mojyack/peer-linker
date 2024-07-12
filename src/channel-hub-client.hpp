@@ -10,6 +10,8 @@ class ChannelHubSession : public wss::WebSocketSession {
 
   public:
     auto start(wss::ServerLocation channel_hub) -> bool;
+
+    virtual ~ChannelHubSession();
 };
 
 class ChannelHubSender : public ChannelHubSession {

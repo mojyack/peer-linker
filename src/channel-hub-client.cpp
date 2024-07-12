@@ -26,6 +26,10 @@ auto ChannelHubSession::start(const wss::ServerLocation channel_hub) -> bool {
     return true;
 }
 
+ChannelHubSession::~ChannelHubSession() {
+    destroy();
+}
+
 // ChannelHubSender
 auto ChannelHubSender::on_packet_received(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, ::p2p::proto::extract_header(payload));

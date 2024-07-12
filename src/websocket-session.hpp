@@ -39,6 +39,8 @@ class WebSocketSession {
 
     auto is_connected() const -> bool;
     auto add_event_handler(uint32_t kind, std::function<EventHandler> handler) -> void;
+    // all subclasses must call destroy in their destructor
+    auto destroy() -> void;
 
   public:
     auto start(ServerLocation server, std::string protocol) -> bool;
@@ -92,6 +94,6 @@ class WebSocketSession {
         proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
     }
 
-    virtual ~WebSocketSession();
+    virtual ~WebSocketSession() {};
 };
 } // namespace p2p::wss

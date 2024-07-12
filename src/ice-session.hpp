@@ -40,6 +40,6 @@ class IceSession : public wss::WebSocketSession {
     auto start(wss::ServerLocation peer_linker, std::string_view pad_name, std::string_view target_pad_name, wss::ServerLocation stun_server) -> bool;
     auto send_packet_p2p(const std::span<const std::byte> payload) -> bool;
 
-    virtual ~IceSession() {}
+    virtual ~IceSession();
 };
 } // namespace p2p::ice
