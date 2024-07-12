@@ -10,10 +10,10 @@ struct Type {
         Unregister,          // server <-  sender => (Success|Error)  unregister channel
         GetChannels,         // server <-  receiver => (GetChannelsResponse|Error)  query registered channels
         GetChannelsResponse, // server ->  receiver => ()  registered channels
-
-        // following commands are relayed p2p
-        PadRequest,         // sender <-  receiver => (Success|Error)  request new pad
-        PadRequestResponse, // sender  -> receiver => ()  registered pad name
+        PadRequest,          // server <-  receiver => (Success|Error)  ask server to send pad request to a channel
+                             // server  -> sender => (PadRequestResponse) request new pad
+        PadRequestResponse,  // server <-  sender => (Success|Error)  ask server to notify receiver creation of pad
+                             // server  -> receiver => () registered pad name
 
         // marker
         Limit,
