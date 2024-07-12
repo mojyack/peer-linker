@@ -123,14 +123,18 @@ auto ChannelHubReceiver::get_channels() -> std::vector<std::string> {
 
 auto ChannelHubReceiver::request_pad(const std::string_view channel_name) -> std::optional<std::string> {
     // setup event handler before sending request
-    auto received = Event();
-    add_event_handler(EventKind::PadCreated, [&](uint32_t) { received.notify(); });
+    struct Events {
+        Event received;
+    };
+    auto events = std::shared_ptr<Events>(new Events());
+
+    add_event_handler(EventKind::PadCreated, [events](uint32_t) { events->received.notify(); });
 
     // check for succeed of request
     assert_o(send_packet(proto::Type::PadRequest, channel_name));
 
     // wait for response
-    received.wait();
+    events->received.wait();
 
     return pad_name_buffer;
 }
