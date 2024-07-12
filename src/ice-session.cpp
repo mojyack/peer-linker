@@ -135,19 +135,23 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
 auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_view pad_name, const std::string_view target_pad_name, const wss::ServerLocation stun_server) -> bool {
     assert_b(wss::WebSocketSession::start(peer_linker, "peer-linker"));
 
-    auto linked_event         = Event();
-    auto sdp_set_event        = Event();
-    auto gathering_done_event = Event();
-    auto connected_event      = Event();
-    add_event_handler(EventKind::Linked, [this, &linked_event](const uint32_t result) {
+    struct Events {
+        Event linked;
+        Event sdp_set;
+        Event gathering_done;
+        Event connected;
+    };
+    auto events = std::shared_ptr<Events>(new Events());
+
+    add_event_handler(EventKind::Linked, [this, events](const uint32_t result) {
         if(!result) {
             stop();
         }
-        linked_event.notify();
+        events->linked.notify();
     });
-    add_event_handler(EventKind::SDPSet, [&](uint32_t) { sdp_set_event.notify(); });
-    add_event_handler(EventKind::RemoteGatheringDone, [&](uint32_t) { gathering_done_event.notify(); });
-    add_event_handler(EventKind::Connected, [&](uint32_t) { connected_event.notify(); });
+    add_event_handler(EventKind::SDPSet, [events](uint32_t) { events->sdp_set.notify(); });
+    add_event_handler(EventKind::RemoteGatheringDone, [events](uint32_t) { events->gathering_done.notify(); });
+    add_event_handler(EventKind::Connected, [events](uint32_t) { events->connected.notify(); });
 
     assert_b(send_packet(plink::proto::Type::Register, pad_name));
     on_pad_created();
@@ -156,7 +160,7 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
     if(!controlled) {
         assert_b(send_packet(plink::proto::Type::Link, target_pad_name));
     }
-    linked_event.wait();
+    events->linked.wait();
 
     auto config = juice_config_t{
         .stun_server_host  = stun_server.address.data(),
@@ -173,7 +177,7 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
     }
     agent.reset(juice_create(&config));
     if(controlled) {
-        sdp_set_event.wait();
+        events->sdp_set.wait();
     }
 
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
@@ -182,8 +186,8 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
     assert_b(send_packet(plink::proto::Type::SetCandidates, std::string_view(sdp.data())));
 
     juice_gather_candidates(agent.get());
-    gathering_done_event.wait();
-    connected_event.wait();
+    events->gathering_done.wait();
+    events->connected.wait();
     return true;
 }
 
