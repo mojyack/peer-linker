@@ -59,8 +59,8 @@ class WebSocketSession {
         auto event   = Event();
         auto result  = bool();
         auto handler = std::function<EventHandler>([&event, &result](uint32_t value) {
-            event.notify();
             result = bool(value);
+            event.notify();
         });
 
         send_packet_detached(type, handler, std::forward<Args>(args)...);
