@@ -1,6 +1,5 @@
 #include "ice-session.hpp"
 #include "macros/unwrap.hpp"
-#include "peer-linker-protocol.hpp"
 #include "util/assert.hpp"
 
 namespace p2p::ice {
@@ -46,7 +45,7 @@ auto IceSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
 }
 
 auto IceSession::on_packet_received(const std::span<const std::byte> payload) -> bool {
-    unwrap_pb(header, proto::extract_header(payload));
+    unwrap_pb(header, p2p::proto::extract_header(payload));
 
     switch(header.type) {
     case plink::proto::Type::Success:
@@ -59,7 +58,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         stop();
         return true;
     case plink::proto::Type::LinkAuth: {
-        const auto requester_name = proto::extract_last_string<plink::proto::LinkAuth>(payload);
+        const auto requester_name = p2p::proto::extract_last_string<plink::proto::LinkAuth>(payload);
         PRINT("received link request from name: ", requester_name);
         const auto ok = auth_peer(requester_name);
         PRINT(ok ? "accepting peer" : "denying peer");
@@ -77,8 +76,8 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         WARN("pad link authentication denied");
         stop();
         return true;
-    case plink::proto::Type::SetCandidates: {
-        const auto sdp = proto::extract_last_string<plink::proto::SetCandidates>(payload);
+    case proto::Type::SetCandidates: {
+        const auto sdp = p2p::proto::extract_last_string<proto::SetCandidates>(payload);
         PRINT("received remote candidates: ", sdp);
         juice_set_remote_description(agent.get(), sdp.data());
         events.invoke(EventKind::SDPSet, no_id, no_value);
@@ -86,15 +85,15 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         send_result(plink::proto::Type::Success, header.id);
         return true;
     }
-    case plink::proto::Type::AddCandidates: {
-        const auto sdp = proto::extract_last_string<plink::proto::AddCandidates>(payload);
+    case proto::Type::AddCandidates: {
+        const auto sdp = p2p::proto::extract_last_string<proto::AddCandidates>(payload);
         PRINT("received additional candidates: ", sdp);
         juice_add_remote_candidate(agent.get(), sdp.data());
 
         send_result(plink::proto::Type::Success, header.id);
         return true;
     }
-    case plink::proto::Type::GatheringDone: {
+    case proto::Type::GatheringDone: {
         PRINT("received gathering done");
         juice_set_remote_gathering_done(agent.get());
         events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
@@ -119,13 +118,13 @@ auto IceSession::on_p2p_connected_state(const bool flag) -> void {
 auto IceSession::on_p2p_new_candidate(const std::string_view sdp) -> void {
     PRINT("new candidate: ", sdp);
     send_packet_detached(
-        plink::proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
+        proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
 }
 
 auto IceSession::on_p2p_gathering_done() -> void {
     PRINT("gathering done");
     send_packet_detached(
-        plink::proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
+        proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
 }
 
 auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload) -> void {
@@ -183,7 +182,7 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
     assert_b(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
     PRINT(pad_name, " sdp: ", sdp.data());
-    assert_b(send_packet(plink::proto::Type::SetCandidates, std::string_view(sdp.data())));
+    assert_b(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
 
     juice_gather_candidates(agent.get());
     events->gathering_done.wait();

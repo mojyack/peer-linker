@@ -18,11 +18,6 @@ struct Type {
         LinkAuth,         // server  -> client => (LinkAuthResponse) ask client to whether a pad is linkable to his
         LinkAuthResponse, // server <-  client => (Success|Error) accept pad linking
 
-        // following commands are valid only when linked
-        SetCandidates,
-        AddCandidates,
-        GatheringDone,
-
         // marker
         Limit,
     };
@@ -46,16 +41,5 @@ struct LinkAuth : ::p2p::proto::Packet {
 struct LinkAuthResponse : ::p2p::proto::Packet {
     uint16_t ok;
     // char requester_name[];
-};
-
-struct SetCandidates : ::p2p::proto::Packet {
-    // char sdp[];
-};
-
-struct AddCandidates : ::p2p::proto::Packet {
-    // char sdp[];
-};
-
-struct GatheringDone : ::p2p::proto::Packet {
 };
 } // namespace p2p::plink::proto
