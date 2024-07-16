@@ -8,17 +8,15 @@ struct Type {
     enum : uint16_t {
         Success,
         Error,
-        // Every packet sent from the client to the server returns a Success or Error packet with the corresponding ID.
-        // The ID of packets sent from the server to the client, excluding result packets, must be ignored
-        Register,         // server <-  client  create pad in server
-        Unregister,       // server <-  client  delete pad in server
-        Link,             // server <-  client  ask server to link self pad to another pad
-        Unlink,           // server <-  client  delete link
-        LinkSuccess,      // server  -> client  notify client to linked successfully
-        LinkDenied,       // server  -> client  notify client to link denied
-        Unlinked,         // server  -> client  notify client to unlinked by other pad
-        LinkAuth,         // server  -> client  ask client to whether a pad is linkable to his
-        LinkAuthResponse, // server <-  client  accept pad linking
+        Register,         // server <-  client => (Success|Error) create pad in server
+        Unregister,       // server <-  client => (Success|Error) delete pad in server
+        Link,             // server <-  client => (Success|Error) ask server to link self pad to another pad
+        Unlink,           // server <-  client => (Success|Error) delete link
+        LinkSuccess,      // server  -> client => () notify client to linked successfully
+        LinkDenied,       // server  -> client => () notify client to link denied
+        Unlinked,         // server  -> client => () notify client to unlinked by other pad
+        LinkAuth,         // server  -> client => (LinkAuthResponse) ask client to whether a pad is linkable to his
+        LinkAuthResponse, // server <-  client => (Success|Error) accept pad linking
 
         // following commands are valid only when linked
         SetCandidates,
