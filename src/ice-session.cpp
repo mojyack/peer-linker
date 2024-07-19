@@ -187,7 +187,7 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
     juice_gather_candidates(agent.get());
     events->gathering_done.wait();
     events->connected.wait();
-    return true;
+    return is_connected();
 }
 
 auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {
