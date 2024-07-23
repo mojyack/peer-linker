@@ -4,7 +4,6 @@
 #include "channel-hub-protocol.hpp"
 #include "macros/unwrap.hpp"
 #include "protocol-helper.hpp"
-#include "util/assert.hpp"
 
 namespace p2p::chub {
 struct EventKind {

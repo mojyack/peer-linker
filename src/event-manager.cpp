@@ -2,7 +2,6 @@
 
 #include "event-manager.hpp"
 #include "macros/unwrap.hpp"
-#include "util/assert.hpp"
 
 namespace p2p {
 auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {

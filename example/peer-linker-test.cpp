@@ -2,7 +2,6 @@
 
 #include "macros/assert.hpp"
 #include "p2p/ice-session.hpp"
-#include "util/assert.hpp"
 
 namespace {
 // const auto server_domain = "saver-local-jitsi";

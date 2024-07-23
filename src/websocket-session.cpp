@@ -1,6 +1,5 @@
 #include "websocket-session.hpp"
 #include "macros/assert.hpp"
-#include "util/assert.hpp"
 
 namespace p2p::wss {
 auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> void {

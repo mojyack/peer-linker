@@ -1,6 +1,5 @@
 #include "ice-session.hpp"
 #include "macros/unwrap.hpp"
-#include "util/assert.hpp"
 
 namespace p2p::ice {
 namespace {

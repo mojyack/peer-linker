@@ -1,6 +1,5 @@
 #include "macros/unwrap.hpp"
 #include "p2p/channel-hub-client.hpp"
-#include "util/assert.hpp"
 
 namespace {
 class ChannelHubSender : public p2p::chub::ChannelHubSender {
