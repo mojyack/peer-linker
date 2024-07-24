@@ -130,8 +130,8 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
     PRINT("p2p data received: ", payload.size(), " bytes");
 }
 
-auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_view pad_name, const std::string_view target_pad_name, const wss::ServerLocation stun_server) -> bool {
-    assert_b(wss::WebSocketSession::start(peer_linker, "peer-linker"));
+auto IceSession::start(const IceSessionParams& params) -> bool {
+    assert_b(wss::WebSocketSession::start(params.peer_linker, "peer-linker"));
 
     struct Events {
         Event linked;
@@ -151,18 +151,19 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
     add_event_handler(EventKind::RemoteGatheringDone, [events](uint32_t) { events->gathering_done.notify(); });
     add_event_handler(EventKind::Connected, [events](uint32_t) { events->connected.notify(); });
 
-    assert_b(send_packet(plink::proto::Type::Register, pad_name));
+    assert_b(send_packet(plink::proto::Type::Register, params.pad_name));
     on_pad_created();
 
-    const auto controlled = target_pad_name.empty();
+    const auto controlled = params.target_pad_name.empty();
     if(!controlled) {
-        assert_b(send_packet(plink::proto::Type::Link, target_pad_name));
+        assert_b(send_packet(plink::proto::Type::Link, params.target_pad_name));
     }
     events->linked.wait();
 
     auto config = juice_config_t{
-        .stun_server_host  = stun_server.address.data(),
-        .stun_server_port  = stun_server.port,
+        .stun_server_host  = params.stun_server.address.data(),
+        .stun_server_port  = params.stun_server.port,
+        .bind_address      = getenv("BIND_ADDR"),
         .cb_state_changed  = on_state_changed,
         .cb_candidate      = on_candidate,
         .cb_gathering_done = on_gathering_done,
@@ -180,7 +181,7 @@ auto IceSession::start(const wss::ServerLocation peer_linker, const std::string_
 
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
     assert_b(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
-    PRINT(pad_name, " sdp: ", sdp.data());
+    PRINT(params.pad_name, " sdp: ", sdp.data());
     assert_b(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
 
     juice_gather_candidates(agent.get());
