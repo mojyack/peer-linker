@@ -45,8 +45,13 @@ auto WebSocketSession::start(const ServerLocation server, std::string protocol) 
         handle_raw_packet(payload);
     };
     websocket_context.dump_packets = true;
-    // TODO: enable ssl
-    assert_b(websocket_context.init(server.address.data(), server.port, "/", protocol.data(), ws::client::SSLLevel::NoSSL));
+    assert_b(websocket_context.init({
+        .address   = server.address.data(),
+        .path      = "/",
+        .protocol  = protocol.data(),
+        .port      = server.port,
+        .ssl_level = ws::client::SSLLevel::NoSSL, // TODO: enable ssl
+    }));
     signaling_worker = std::thread([this]() -> void {
         while(!disconnected && websocket_context.state == ws::client::State::Connected) {
             websocket_context.process();
