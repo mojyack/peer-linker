@@ -43,7 +43,7 @@ class WebSocketSession {
     auto destroy() -> void;
 
   public:
-    auto start(ServerLocation server, std::string protocol) -> bool;
+    auto start(ServerLocation server, std::string protocol, const char* bind_address = nullptr) -> bool;
     auto stop() -> void;
 
     auto allocate_packet_id() -> uint32_t {
@@ -94,6 +94,6 @@ class WebSocketSession {
         proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
     }
 
-    virtual ~WebSocketSession() {};
+    virtual ~WebSocketSession(){};
 };
 } // namespace p2p::wss

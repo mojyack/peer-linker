@@ -39,18 +39,19 @@ auto WebSocketSession::destroy() -> void {
     }
 }
 
-auto WebSocketSession::start(const ServerLocation server, std::string protocol) -> bool {
+auto WebSocketSession::start(const ServerLocation server, std::string protocol, const char* bind_address) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
         PRINT("received ", payload.size(), " bytes");
         handle_raw_packet(payload);
     };
     websocket_context.dump_packets = true;
     assert_b(websocket_context.init({
-        .address   = server.address.data(),
-        .path      = "/",
-        .protocol  = protocol.data(),
-        .port      = server.port,
-        .ssl_level = ws::client::SSLLevel::NoSSL, // TODO: enable ssl
+        .address      = server.address.data(),
+        .path         = "/",
+        .protocol     = protocol.data(),
+        .bind_address = bind_address,
+        .port         = server.port,
+        .ssl_level    = ws::client::SSLLevel::NoSSL, // TODO: enable ssl
     }));
     signaling_worker = std::thread([this]() -> void {
         while(!disconnected && websocket_context.state == ws::client::State::Connected) {

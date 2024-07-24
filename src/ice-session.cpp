@@ -131,7 +131,7 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
 }
 
 auto IceSession::start(const IceSessionParams& params) -> bool {
-    assert_b(wss::WebSocketSession::start(params.peer_linker, "peer-linker"));
+    assert_b(wss::WebSocketSession::start(params.peer_linker, "peer-linker", params.bind_address));
 
     struct Events {
         Event linked;
@@ -163,7 +163,7 @@ auto IceSession::start(const IceSessionParams& params) -> bool {
     auto config = juice_config_t{
         .stun_server_host  = params.stun_server.address.data(),
         .stun_server_port  = params.stun_server.port,
-        .bind_address      = getenv("BIND_ADDR"),
+        .bind_address      = params.bind_address,
         .cb_state_changed  = on_state_changed,
         .cb_candidate      = on_candidate,
         .cb_gathering_done = on_gathering_done,

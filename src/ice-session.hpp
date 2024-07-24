@@ -46,6 +46,7 @@ struct IceSessionParams {
     wss::ServerLocation stun_server;
     std::string_view    pad_name;
     std::string_view    target_pad_name;
+    const char*         bind_address = nullptr;
 };
 
 class IceSession : public wss::WebSocketSession {
