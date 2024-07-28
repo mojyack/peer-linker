@@ -47,7 +47,7 @@ class WebSocketSession {
 
     auto start(ServerLocation server, std::string protocol, const char* bind_address = nullptr) -> bool;
     auto stop() -> void;
-    auto set_ws_debug_flags(bool verbose, bool dump_packets, uint8_t libws_debug_bitmap) -> void;
+    auto set_ws_debug_flags(bool verbose, bool dump_packets) -> void;
 
     auto allocate_packet_id() -> uint32_t {
         return packet_id += 1;

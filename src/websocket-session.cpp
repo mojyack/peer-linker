@@ -75,9 +75,8 @@ auto WebSocketSession::stop() -> void {
     on_disconnected();
 }
 
-auto WebSocketSession::set_ws_debug_flags(const bool verbose, const bool dump_packets, const uint8_t libws_debug_bitmap) -> void {
+auto WebSocketSession::set_ws_debug_flags(const bool verbose, const bool dump_packets) -> void {
     websocket_context.verbose      = verbose;
     websocket_context.dump_packets = dump_packets;
-    ws::set_log_level(libws_debug_bitmap);
 }
 } // namespace p2p::wss
