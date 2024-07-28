@@ -1,7 +1,9 @@
 #include "macros/unwrap.hpp"
 #include "peer-linker-protocol.hpp"
 #include "protocol-helper.hpp"
+#include "server-args.hpp"
 #include "util/string-map.hpp"
+#include "ws/misc.hpp"
 #include "ws/server.hpp"
 
 namespace p2p::plink {
@@ -48,6 +50,7 @@ static_assert(Error::Limit == estr.size());
 struct Server {
     ws::server::Context websocket_context;
     StringMap<Pad>      pads;
+    bool                verbose = false;
 
     auto remove_pad(Pad* pad) -> void {
         if(pad == nullptr) {
@@ -149,12 +152,16 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         }
     } break;
     default: {
-        PRINT("received general command ", int(header.type));
+        if(server->verbose) {
+            PRINT("received general command ", int(header.type));
+        }
 
         assert_b(pad != nullptr, estr[Error::NotRegistered]);
         assert_b(pad->linked != nullptr, estr[Error::NotLinked]);
 
-        PRINT("passthroughing packet from ", pad->name, " to ", pad->linked->name);
+        if(server->verbose) {
+            PRINT("passthroughing packet from ", pad->name, " to ", pad->linked->name);
+        }
 
         assert_b(server->websocket_context.send(pad->linked->wsi, payload));
         return true;
@@ -190,8 +197,16 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         : server(&server) {}
 };
 
-auto run() -> bool {
-    auto server = Server();
+auto run(const int argc, const char* argv[]) -> bool {
+    const auto args = ServerArgs::parse(argc, argv);
+    if(!args || args->help) {
+        print("usage peer-linker (option)...");
+        print("options:", ServerArgs::usage);
+        return true;
+    }
+
+    auto server    = Server();
+    server.verbose = args->verbose;
 
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
@@ -210,9 +225,11 @@ auto run() -> bool {
         }
     };
     wsctx.session_data_initer.reset(new SessionDataInitializer(server));
-    wsctx.verbose      = true;
-    wsctx.dump_packets = true;
+    wsctx.verbose      = args->websocket_verbose;
+    wsctx.dump_packets = args->websocket_dump_packets;
+    ws::set_log_level(args->libws_debug_bitmap);
     assert_b(wsctx.init(8080, "peer-linker"));
+    print("ready");
     while(wsctx.state == ws::server::State::Connected) {
         wsctx.process();
     }
@@ -221,6 +238,6 @@ auto run() -> bool {
 } // namespace
 } // namespace p2p::plink
 
-auto main() -> int {
-    return p2p::plink::run() ? 0 : 1;
+auto main(const int argc, const char* argv[]) -> int {
+    return p2p::plink::run(argc, argv) ? 0 : 1;
 }
