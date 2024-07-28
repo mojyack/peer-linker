@@ -8,7 +8,7 @@ declare_autoptr(JuiceAgent, juice_agent_t, juice_destroy);
 
 struct EventKind {
     enum {
-        Connected = wss::EventKind::Limit,
+        Connected = plink::EventKind::Limit,
         SDPSet,
         RemoteGatheringDone,
         Linked,
