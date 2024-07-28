@@ -2,7 +2,6 @@
 #include "peer-linker-protocol.hpp"
 #include "protocol-helper.hpp"
 #include "util/string-map.hpp"
-#include "ws/misc.hpp"
 #include "ws/server.hpp"
 
 namespace p2p::plink {
