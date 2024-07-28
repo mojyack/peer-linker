@@ -4,7 +4,7 @@
 #include "server-args.hpp"
 #include "util/charconv.hpp"
 
-auto ServerArgs::usage = R"(
+const char* ServerArgs::usage = R"(
     -h          print help
     -v          enable signaling server debug output
     -wv         enable websocket debug output
