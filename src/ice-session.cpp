@@ -31,50 +31,10 @@ auto on_recv(juice_agent_t* const /*agent*/, const char* const data, const size_
 }
 } // namespace
 
-auto IceSession::get_error_packet_type() const -> uint16_t {
-    return plink::proto::Type::Error;
-}
-
-auto IceSession::on_pad_created() -> void {
-    PRINT("pad created");
-}
-
-auto IceSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
-    return false;
-}
-
 auto IceSession::on_packet_received(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, p2p::proto::extract_header(payload));
 
     switch(header.type) {
-    case plink::proto::Type::Success:
-        events.invoke(wss::EventKind::Result, header.id, 1);
-        return true;
-    case plink::proto::Type::Error:
-        events.invoke(wss::EventKind::Result, header.id, 0);
-        return true;
-    case plink::proto::Type::Unlinked:
-        stop();
-        return true;
-    case plink::proto::Type::LinkAuth: {
-        const auto requester_name = p2p::proto::extract_last_string<plink::proto::LinkAuth>(payload);
-        PRINT("received link request from name: ", requester_name);
-        const auto ok = auth_peer(requester_name);
-        PRINT(ok ? "accepting peer" : "denying peer");
-        send_packet_detached(
-            plink::proto::Type::LinkAuthResponse, [this](const uint32_t result) {
-                events.invoke(EventKind::Linked, no_id, result);
-            },
-            uint16_t(ok), requester_name);
-        return true;
-    }
-    case plink::proto::Type::LinkSuccess:
-        events.invoke(EventKind::Linked, no_id, 1);
-        return true;
-    case plink::proto::Type::LinkDenied:
-        WARN("pad link authentication denied");
-        stop();
-        return true;
     case proto::Type::SetCandidates: {
         const auto sdp = p2p::proto::extract_last_string<proto::SetCandidates>(payload);
         PRINT("received remote candidates: ", sdp);
@@ -101,8 +61,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         return true;
     }
     default:
-        WARN("unhandled payload type ", int(header.type));
-        return false;
+        return plink::PeerLinkerSession::on_packet_received(payload);
     }
 }
 
@@ -130,35 +89,21 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
     PRINT("p2p data received: ", payload.size(), " bytes");
 }
 
-auto IceSession::start(const IceSessionParams& params) -> bool {
-    assert_b(wss::WebSocketSession::start(params.peer_linker, "peer-linker", params.bind_address));
+auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
+    assert_b(plink::PeerLinkerSession::start(params));
 
     struct Events {
-        Event linked;
         Event sdp_set;
         Event gathering_done;
         Event connected;
     };
     auto events = std::shared_ptr<Events>(new Events());
 
-    add_event_handler(EventKind::Linked, [this, events](const uint32_t result) {
-        if(!result) {
-            stop();
-        }
-        events->linked.notify();
-    });
     add_event_handler(EventKind::SDPSet, [events](uint32_t) { events->sdp_set.notify(); });
     add_event_handler(EventKind::RemoteGatheringDone, [events](uint32_t) { events->gathering_done.notify(); });
     add_event_handler(EventKind::Connected, [events](uint32_t) { events->connected.notify(); });
 
-    assert_b(send_packet(plink::proto::Type::Register, params.pad_name));
-    on_pad_created();
-
     const auto controlled = params.target_pad_name.empty();
-    if(!controlled) {
-        assert_b(send_packet(plink::proto::Type::Link, params.target_pad_name));
-    }
-    events->linked.wait();
 
     auto config = juice_config_t{
         .stun_server_host  = params.stun_server.address.data(),
@@ -193,9 +138,5 @@ auto IceSession::start(const IceSessionParams& params) -> bool {
 auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {
     assert_b(juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0);
     return true;
-}
-
-IceSession::~IceSession() {
-    destroy();
 }
 } // namespace p2p::ice

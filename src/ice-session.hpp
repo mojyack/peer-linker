@@ -2,7 +2,7 @@
 #include <juice/juice.h>
 
 #include "peer-linker-protocol.hpp"
-#include "websocket-session.hpp"
+#include "peer-linker-session.hpp"
 
 namespace p2p::ice {
 namespace proto {
@@ -41,23 +41,11 @@ struct EventKind {
     };
 };
 
-struct IceSessionParams {
-    wss::ServerLocation peer_linker;
-    wss::ServerLocation stun_server;
-    std::string_view    pad_name;
-    std::string_view    target_pad_name;
-    const char*         bind_address = nullptr;
-};
-
-class IceSession : public wss::WebSocketSession {
+class IceSession : public plink::PeerLinkerSession {
   private:
     AutoJuiceAgent agent;
 
-    auto get_error_packet_type() const -> uint16_t override;
-
   protected:
-    virtual auto on_pad_created() -> void;
-    virtual auto auth_peer(std::string_view peer_name) -> bool;
     virtual auto on_packet_received(std::span<const std::byte> payload) -> bool override;
 
   public:
@@ -69,9 +57,9 @@ class IceSession : public wss::WebSocketSession {
     // api
     virtual auto on_p2p_packet_received(std::span<const std::byte> payload) -> void;
 
-    auto start(const IceSessionParams& params) -> bool;
+    auto start(const plink::PeerLinkerSessionParams& params) -> bool;
     auto send_packet_p2p(const std::span<const std::byte> payload) -> bool;
 
-    virtual ~IceSession();
+    virtual ~IceSession() {}
 };
 } // namespace p2p::ice
