@@ -43,6 +43,8 @@ class WebSocketSession {
     auto destroy() -> void;
 
   public:
+    bool verbose = false;
+
     auto start(ServerLocation server, std::string protocol, const char* bind_address = nullptr) -> bool;
     auto stop() -> void;
 

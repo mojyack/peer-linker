@@ -30,9 +30,12 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
         return true;
     case proto::Type::LinkAuth: {
         const auto requester_name = p2p::proto::extract_last_string<proto::LinkAuth>(payload);
-        PRINT("received link request from name: ", requester_name);
+
         const auto ok = auth_peer(requester_name);
-        PRINT(ok ? "accepting peer" : "denying peer");
+        if(verbose) {
+            PRINT("received link request from name: ", requester_name);
+            PRINT(ok ? "accepting peer" : "denying peer");
+        }
         send_packet_detached(
             proto::Type::LinkAuthResponse, [this](const uint32_t result) {
                 events.invoke(EventKind::Linked, no_id, result);
