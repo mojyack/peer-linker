@@ -41,7 +41,9 @@ auto WebSocketSession::destroy() -> void {
 
 auto WebSocketSession::start(const ServerLocation server, std::string protocol, const char* bind_address) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
-        PRINT("received ", payload.size(), " bytes");
+        if(websocket_context.verbose) {
+            PRINT("received ", payload.size(), " bytes");
+        }
         handle_raw_packet(payload);
     };
     websocket_context.dump_packets = true;
