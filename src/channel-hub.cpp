@@ -208,6 +208,7 @@ auto run(const int argc, const char* argv[]) -> bool {
     wsctx.dump_packets = args->websocket_dump_packets;
     ws::set_log_level(args->libws_debug_bitmap);
     assert_b(wsctx.init(8081, "channel-hub"));
+    print("ready");
     while(wsctx.state == ws::server::State::Connected) {
         wsctx.process();
     }
