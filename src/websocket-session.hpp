@@ -81,17 +81,17 @@ class WebSocketSession {
             .id      = id,
             .handler = handler,
         });
-        proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
+        websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
     }
 
     template <class... Args>
     auto send_result(uint16_t type, uint16_t id, Args... args) -> void {
-        proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
+        websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
     }
 
     template <class... Args>
     auto send_generic_packet(uint16_t type, uint16_t id, Args... args) -> void {
-        proto::send_packet(websocket_context.wsi, type, id, std::forward<Args>(args)...);
+        websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
     }
 
     virtual ~WebSocketSession(){};

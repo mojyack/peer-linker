@@ -47,17 +47,25 @@ const auto estr = std::array{
 static_assert(Error::Limit == estr.size());
 
 struct Server {
-    StringMap<Pad> pads;
+    ws::server::Context websocket_context;
+    StringMap<Pad>      pads;
 
     auto remove_pad(Pad* pad) -> void {
         if(pad == nullptr) {
             return;
         }
         if(pad->linked) {
-            p2p::proto::send_packet(pad->linked->wsi, proto::Type::Unlinked, 0);
+            send_to(pad->linked->wsi, proto::Type::Unlinked, 0);
             pad->linked->linked = nullptr;
         }
         pads.erase(pad->name);
+    }
+
+    template <class... Args>
+    auto send_to(lws* const wsi, const uint16_t type, const uint32_t id, Args... args) -> bool {
+        const auto packet = p2p::proto::build_packet(type, id, args...);
+        assert_b(websocket_context.send(wsi, packet));
+        return true;
     }
 };
 
@@ -104,8 +112,8 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         auto& requestee = it->second;
 
         PRINT("sending auth request from ", pad->name, " to ", requestee_name);
+        assert_b(server->send_to(requestee.wsi, proto::Type::LinkAuth, 0, pad->name));
         pad->authenticator_name = requestee.name;
-        p2p::proto::send_packet(requestee.wsi, proto::Type::LinkAuth, 0, pad->name);
     } break;
     case proto::Type::Unlink: {
         PRINT("received unlink request");
@@ -114,7 +122,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         assert_b(pad->linked != nullptr, estr[Error::NotLinked]);
 
         PRINT("unlinking pad ", pad->name, " and ", pad->linked->name);
-        p2p::proto::send_packet(pad->linked->wsi, proto::Type::Unlinked, 0);
+        assert_b(server->send_to(pad->linked->wsi, proto::Type::Unlinked, 0));
         pad->linked->linked = nullptr;
         pad->linked         = nullptr;
     } break;
@@ -133,12 +141,12 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 
         pad->authenticator_name.clear();
         if(packet.ok == 0) {
-            p2p::proto::send_packet(requester.wsi, proto::Type::LinkDenied, header.id);
+            assert_b(server->send_to(requester.wsi, proto::Type::LinkDenied, header.id));
         } else {
             PRINT("linking ", pad->name, " and ", requester.name);
+            assert_b(server->send_to(requester.wsi, proto::Type::LinkSuccess, 0));
             pad->linked      = &requester;
             requester.linked = pad;
-            p2p::proto::send_packet(requester.wsi, proto::Type::LinkSuccess, 0);
         }
     } break;
     default: {
@@ -148,12 +156,13 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         assert_b(pad->linked != nullptr, estr[Error::NotLinked]);
 
         PRINT("passthroughing packet from ", pad->name, " to ", pad->linked->name);
-        ws::write_back(pad->linked->wsi, payload.data(), payload.size());
+
+        assert_b(server->websocket_context.send(pad->linked->wsi, payload));
         return true;
     }
     }
 
-    p2p::proto::send_packet(wsi, proto::Type::Success, header.id);
+    assert_b(server->send_to(wsi, proto::Type::Success, header.id));
     return true;
 }
 
@@ -185,8 +194,8 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 auto run() -> bool {
     auto server = Server();
 
-    auto wsctx    = ws::server::Context();
-    wsctx.handler = [](lws* wsi, std::span<const std::byte> payload) -> void {
+    auto& wsctx   = server.websocket_context;
+    wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
         PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
         if(!session.handle_payload(payload)) {
@@ -195,9 +204,9 @@ auto run() -> bool {
             const auto& header_o = p2p::proto::extract_header(payload);
             if(!header_o) {
                 WARN("packet too short");
-                p2p::proto::send_packet(wsi, proto::Type::Error, 0);
+                assert_n(server.send_to(wsi, proto::Type::Error, 0));
             } else {
-                p2p::proto::send_packet(wsi, proto::Type::Error, header_o->id);
+                assert_n(server.send_to(wsi, proto::Type::Error, header_o->id));
             }
         }
     };

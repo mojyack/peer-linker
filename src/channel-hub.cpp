@@ -45,9 +45,13 @@ struct Session {
 };
 
 struct Server {
+    ws::server::Context                    websocket_context;
     StringMap<Channel>                     channels;
     std::unordered_map<uint32_t, Session*> pending_sessions;
     uint32_t                               packet_id;
+
+    template <class... Args>
+    auto send_to(lws* wsi, uint16_t type, const uint32_t id, Args... args) -> bool;
 };
 
 auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
@@ -89,7 +93,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
             std::memcpy(payload.data() + prev_size, name.data(), name.size() + 1);
         }
 
-        p2p::proto::send_packet(wsi, proto::Type::GetChannelsResponse, header.id, payload);
+        assert_b(server->send_to(wsi, proto::Type::GetChannelsResponse, header.id, payload));
         return true;
     } break;
     case proto::Type::PadRequest: {
@@ -106,8 +110,8 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         auto& channel = it->second;
 
         const auto id = server->packet_id += 1;
+        assert_b(server->send_to(channel.wsi, proto::Type::PadRequest, id, name));
         server->pending_sessions.insert({id, this});
-        p2p::proto::send_packet(channel.wsi, proto::Type::PadRequest, id, name);
     } break;
     case proto::Type::PadRequestResponse: {
         PRINT("received pad request response");
@@ -121,7 +125,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         server->pending_sessions.erase(header.id);
 
         PRINT("sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
-        p2p::proto::send_packet(requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name);
+        assert_b(server->send_to(requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
     } break;
     default: {
         WARN("unknown command ", int(header.type));
@@ -129,7 +133,14 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
     }
     }
 
-    p2p::proto::send_packet(wsi, proto::Type::Success, header.id);
+    assert_b(server->send_to(wsi, proto::Type::Success, header.id));
+    return true;
+}
+
+template <class... Args>
+auto Server::send_to(lws* const wsi, const uint16_t type, const uint32_t id, Args... args) -> bool {
+    const auto packet = p2p::proto::build_packet(type, id, args...);
+    assert_b(websocket_context.send(wsi, packet));
     return true;
 }
 
@@ -167,8 +178,8 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 auto run() -> bool {
     auto server = Server();
 
-    auto wsctx    = ws::server::Context();
-    wsctx.handler = [](lws* wsi, std::span<const std::byte> payload) -> void {
+    auto& wsctx   = server.websocket_context;
+    wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
         PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
         if(!session.handle_payload(payload)) {
@@ -177,9 +188,9 @@ auto run() -> bool {
             const auto& header_o = p2p::proto::extract_header(payload);
             if(!header_o) {
                 WARN("packet too short");
-                p2p::proto::send_packet(wsi, proto::Type::Error, 0);
+                assert_n(server.send_to(wsi, proto::Type::Error, 0));
             } else {
-                p2p::proto::send_packet(wsi, proto::Type::Error, header_o->id);
+                assert_n(server.send_to(wsi, proto::Type::Error, header_o->id));
             }
         }
     };
