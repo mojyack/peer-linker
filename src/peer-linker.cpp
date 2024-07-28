@@ -211,7 +211,9 @@ auto run(const int argc, const char* argv[]) -> bool {
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
-        PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
+        if(server.verbose) {
+            PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
+        }
         if(!session.handle_payload(payload)) {
             WARN("payload handling failed");
 
