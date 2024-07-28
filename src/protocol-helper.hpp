@@ -1,10 +1,10 @@
 #pragma once
 #include <cstring>
+#include <span>
 #include <string_view>
+#include <vector>
 
 #include "protocol.hpp"
-#include "ws/impl.hpp"
-#include "ws/misc.hpp"
 
 namespace p2p::proto {
 inline auto extract_header(const std::span<const std::byte> payload) -> const Packet* {
@@ -66,11 +66,5 @@ inline auto build_packet(uint16_t type, uint32_t id, Args... args) -> std::vecto
     add_parameters(buffer, args...);
     *(std::bit_cast<Packet*>(buffer.data())) = Packet{uint16_t(buffer.size()), type, id};
     return buffer;
-}
-
-template <class... Args>
-inline auto send_packet(lws* wsi, uint16_t type, uint32_t id, Args... args) -> void {
-    const auto buffer = build_packet(type, id, args...);
-    ws::write_back(wsi, buffer.data(), buffer.size());
 }
 } // namespace p2p::proto
