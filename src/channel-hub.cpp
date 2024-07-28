@@ -1,7 +1,9 @@
 #include "channel-hub-protocol.hpp"
 #include "macros/unwrap.hpp"
 #include "protocol-helper.hpp"
+#include "server-args.hpp"
 #include "util/string-map.hpp"
+#include "ws/misc.hpp"
 #include "ws/server.hpp"
 
 namespace p2p::chub {
@@ -175,7 +177,14 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         : server(&server) {}
 };
 
-auto run() -> bool {
+auto run(const int argc, const char* argv[]) -> bool {
+    const auto args = ServerArgs::parse(argc, argv);
+    if(!args || args->help) {
+        print("usage channel-hub (option)...");
+        print("options:", ServerArgs::usage);
+        return true;
+    }
+
     auto server = Server();
 
     auto& wsctx   = server.websocket_context;
@@ -195,8 +204,9 @@ auto run() -> bool {
         }
     };
     wsctx.session_data_initer.reset(new SessionDataInitializer(server));
-    wsctx.verbose      = true;
-    wsctx.dump_packets = true;
+    wsctx.verbose      = args->websocket_verbose;
+    wsctx.dump_packets = args->websocket_dump_packets;
+    ws::set_log_level(args->libws_debug_bitmap);
     assert_b(wsctx.init(8081, "channel-hub"));
     while(wsctx.state == ws::server::State::Connected) {
         wsctx.process();
@@ -206,6 +216,6 @@ auto run() -> bool {
 } // namespace
 } // namespace p2p::chub
 
-auto main() -> int {
-    return p2p::chub::run() ? 0 : 1;
+auto main(const int argc, const char* argv[]) -> int {
+    return p2p::chub::run(argc, argv) ? 0 : 1;
 }
