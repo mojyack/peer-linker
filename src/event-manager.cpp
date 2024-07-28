@@ -5,10 +5,12 @@
 
 namespace p2p {
 auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
-    if(id != no_id) {
-        PRINT("new event kind: ", kind, " id: ", id, " value: ", value);
-    } else {
-        PRINT("new event kind: ", kind, " value: ", value);
+    if(debug) {
+        if(id != no_id) {
+            PRINT("new event kind: ", kind, " id: ", id, " value: ", value);
+        } else {
+            PRINT("new event kind: ", kind, " value: ", value);
+        }
     }
 
     auto found = std::optional<EventHandlerInfo>();
@@ -27,11 +29,19 @@ auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> v
 }
 
 auto Events::add_handler(EventHandlerInfo info) -> void {
+    if(debug) {
+        PRINT("new event handler registered kind: ", info.kind, " id: ", info.id);
+    }
+
     auto guard = std::lock_guard(lock);
     handlers.push_back(info);
 }
 
 auto Events::drain() -> void {
+    if(debug) {
+        PRINT("draining...");
+    }
+
 loop:
     auto found = std::optional<EventHandlerInfo>();
     {

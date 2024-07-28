@@ -19,6 +19,7 @@ struct EventHandlerInfo {
 struct Events {
     std::mutex                    lock;
     std::vector<EventHandlerInfo> handlers;
+    bool                          debug = false;
 
     auto invoke(uint32_t kind, uint32_t id, uint32_t value) -> void;
     auto add_handler(EventHandlerInfo info) -> void;
