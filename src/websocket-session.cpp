@@ -1,5 +1,6 @@
 #include "websocket-session.hpp"
 #include "macros/assert.hpp"
+#include "ws/misc.hpp"
 
 namespace p2p::wss {
 auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> void {
@@ -46,7 +47,6 @@ auto WebSocketSession::start(const ServerLocation server, std::string protocol, 
         }
         handle_raw_packet(payload);
     };
-    websocket_context.dump_packets = true;
     assert_b(websocket_context.init({
         .address      = server.address.data(),
         .path         = "/",
@@ -73,5 +73,11 @@ auto WebSocketSession::stop() -> void {
         websocket_context.shutdown();
     }
     on_disconnected();
+}
+
+auto WebSocketSession::set_ws_debug_flags(const bool verbose, const bool dump_packets, const uint8_t libws_debug_bitmap) -> void {
+    websocket_context.verbose      = verbose;
+    websocket_context.dump_packets = dump_packets;
+    ws::set_log_level(libws_debug_bitmap);
 }
 } // namespace p2p::wss
