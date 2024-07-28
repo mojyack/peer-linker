@@ -1,4 +1,5 @@
 #include "ice-session.hpp"
+#include "ice-session-protocol.hpp"
 #include "macros/unwrap.hpp"
 
 namespace p2p::ice {
