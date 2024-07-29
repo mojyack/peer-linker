@@ -24,7 +24,8 @@ class PeerLinkerSession : public wss::WebSocketSession {
 
   protected:
     virtual auto on_pad_created() -> void;
-    virtual auto auth_peer(std::string_view peer_name) -> bool;
+    virtual auto get_auth_secret() -> std::vector<std::byte>;
+    virtual auto auth_peer(std::string_view peer_name, std::span<const std::byte> secret) -> bool;
     virtual auto on_packet_received(std::span<const std::byte> payload) -> bool override;
 
   public:

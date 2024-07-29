@@ -11,7 +11,11 @@ auto PeerLinkerSession::on_pad_created() -> void {
     PRINT("pad created");
 }
 
-auto PeerLinkerSession::auth_peer(const std::string_view /*peer_name*/) -> bool {
+auto PeerLinkerSession::get_auth_secret() -> std::vector<std::byte> {
+    return {};
+}
+
+auto PeerLinkerSession::auth_peer(const std::string_view /*peer_name*/, const std::span<const std::byte> /*secret*/) -> bool {
     return false;
 }
 
@@ -29,9 +33,11 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
         stop();
         return true;
     case proto::Type::LinkAuth: {
-        const auto requester_name = p2p::proto::extract_last_string<proto::LinkAuth>(payload);
+        unwrap_pb(packet, p2p::proto::extract_payload<proto::LinkAuth>(payload));
+        const auto requester_name = std::string_view(std::bit_cast<char*>(payload.data() + sizeof(proto::Link)), packet.requester_name_len);
+        const auto secret         = std::span(payload.data() + sizeof(proto::Link) + packet.requester_name_len, packet.secret_len);
 
-        const auto ok = auth_peer(requester_name);
+        const auto ok = auth_peer(requester_name, secret);
         if(verbose) {
             PRINT("received link request from name: ", requester_name);
             PRINT(ok ? "accepting peer" : "denying peer");
@@ -76,7 +82,12 @@ auto PeerLinkerSession::start(const PeerLinkerSessionParams& params) -> bool {
 
     const auto controlled = params.target_pad_name.empty();
     if(!controlled) {
-        assert_b(send_packet(proto::Type::Link, params.target_pad_name));
+        const auto secret = get_auth_secret();
+        assert_b(send_packet(proto::Type::Link,
+                             uint16_t(params.target_pad_name.size()),
+                             uint16_t(secret.size()),
+                             params.target_pad_name,
+                             secret));
     }
     events->linked.wait();
 

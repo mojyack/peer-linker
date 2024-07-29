@@ -28,14 +28,20 @@ struct Register : ::p2p::proto::Packet {
 };
 
 struct Link : ::p2p::proto::Packet {
+    uint16_t requestee_name_len;
+    uint16_t secret_len;
     // char requestee_name[];
+    // std::byte secret[];
 };
 
 struct Unlink : ::p2p::proto::Packet {
 };
 
 struct LinkAuth : ::p2p::proto::Packet {
+    uint16_t requester_name_len;
+    uint16_t secret_len;
     // char requester_name[];
+    // std::byte secret[];
 };
 
 struct LinkAuthResponse : ::p2p::proto::Packet {

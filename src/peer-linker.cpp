@@ -103,7 +103,10 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         pad = nullptr;
     } break;
     case proto::Type::Link: {
-        const auto requestee_name = p2p::proto::extract_last_string<proto::Link>(payload);
+        unwrap_pb(packet, p2p::proto::extract_payload<proto::Link>(payload));
+        assert_b(sizeof(proto::Link) + packet.requestee_name_len + packet.secret_len == payload.size());
+        const auto requestee_name = std::string_view(std::bit_cast<char*>(payload.data() + sizeof(proto::Link)), packet.requestee_name_len);
+        const auto secret         = std::span(payload.data() + sizeof(proto::Link) + packet.requestee_name_len, packet.secret_len);
         PRINT("received pad link request to ", requestee_name);
 
         assert_b(pad != nullptr, estr[Error::NotRegistered]);
@@ -114,7 +117,11 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
         auto& requestee = it->second;
 
         PRINT("sending auth request from ", pad->name, " to ", requestee_name);
-        assert_b(server->send_to(requestee.wsi, proto::Type::LinkAuth, 0, pad->name));
+        assert_b(server->send_to(requestee.wsi, proto::Type::LinkAuth, 0,
+                                 uint16_t(pad->name.size()),
+                                 uint16_t(secret.size()),
+                                 pad->name,
+                                 secret));
         pad->authenticator_name = requestee.name;
     } break;
     case proto::Type::Unlink: {

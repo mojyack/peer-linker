@@ -1,3 +1,4 @@
+#include <cstring>
 #include <thread>
 
 #include "macros/assert.hpp"
@@ -10,8 +11,14 @@ const auto server_domain = "localhost";
 const auto server_port   = 8080;
 
 class ClientSession : public p2p::ice::IceSession {
-    auto auth_peer(std::string_view peer_name) -> bool override {
-        return peer_name == "agent a";
+    auto get_auth_secret() -> std::vector<std::byte> override {
+        auto secret = std::vector<std::byte>(strlen("password") + 1);
+        std::strcpy((char*)secret.data(), "password");
+        return secret;
+    }
+
+    auto auth_peer(std::string_view peer_name, std::span<const std::byte> secret) -> bool override {
+        return peer_name == "agent a" && std::strcmp((char*)secret.data(), "password") == 0;
     }
 };
 
