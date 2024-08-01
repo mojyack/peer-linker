@@ -50,9 +50,10 @@ auto WebSocketSession::start(const ServerLocation server, std::string protocol, 
         .address      = server.address.data(),
         .path         = "/",
         .protocol     = protocol.data(),
+        .cert         = nullptr,
         .bind_address = bind_address,
         .port         = server.port,
-        .ssl_level    = ws::client::SSLLevel::NoSSL, // TODO: enable ssl
+        .ssl_level    = ws::client::SSLLevel::Disable, // TODO: enable ssl
     }));
     signaling_worker = std::thread([this]() -> void {
         while(!disconnected && websocket_context.state == ws::client::State::Connected) {
