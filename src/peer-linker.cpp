@@ -241,7 +241,7 @@ auto run(const int argc, const char* argv[]) -> bool {
         .protocol    = "peer-linker",
         .cert        = nullptr,
         .private_key = nullptr,
-        .port        = 8081,
+        .port        = 8080,
     }));
     print("ready");
     while(wsctx.state == ws::server::State::Connected) {
