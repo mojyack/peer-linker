@@ -178,7 +178,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub"));
+    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8081));
 
     auto server = Server();
 
@@ -206,7 +206,7 @@ auto run(const int argc, const char* argv[]) -> bool {
         .protocol    = "channel-hub",
         .cert        = nullptr,
         .private_key = nullptr,
-        .port        = 8081,
+        .port        = args.port,
     }));
     print("ready");
     while(wsctx.state == ws::server::State::Connected) {

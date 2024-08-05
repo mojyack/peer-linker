@@ -205,7 +205,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub"));
+    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8080));
 
     auto server    = Server();
     server.verbose = args.verbose;
@@ -236,7 +236,7 @@ auto run(const int argc, const char* argv[]) -> bool {
         .protocol    = "peer-linker",
         .cert        = nullptr,
         .private_key = nullptr,
-        .port        = 8080,
+        .port        = args.port,
     }));
     print("ready");
     while(wsctx.state == ws::server::State::Connected) {
