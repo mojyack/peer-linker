@@ -178,12 +178,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    const auto args = ServerArgs::parse(argc, argv);
-    if(!args || args->help) {
-        print("usage channel-hub (option)...");
-        print("options:", ServerArgs::usage);
-        return true;
-    }
+    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub"));
 
     auto server = Server();
 
@@ -204,9 +199,9 @@ auto run(const int argc, const char* argv[]) -> bool {
         }
     };
     wsctx.session_data_initer.reset(new SessionDataInitializer(server));
-    wsctx.verbose      = args->websocket_verbose;
-    wsctx.dump_packets = args->websocket_dump_packets;
-    ws::set_log_level(args->libws_debug_bitmap);
+    wsctx.verbose      = args.websocket_verbose;
+    wsctx.dump_packets = args.websocket_dump_packets;
+    ws::set_log_level(args.libws_debug_bitmap);
     assert_b(wsctx.init({
         .protocol    = "channel-hub",
         .cert        = nullptr,

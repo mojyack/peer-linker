@@ -1,37 +1,17 @@
-#include <string_view>
-
-#include "macros/unwrap.hpp"
 #include "server-args.hpp"
-#include "util/charconv.hpp"
+#include "util/argument-parser.hpp"
 
-const char* ServerArgs::usage = R"(
-    -h          print help
-    -v          enable signaling server debug output
-    -wv         enable websocket debug output
-    -wd         dump every websocket packets
-    -wb BITMAP  libwebsockets debug flag bitmap
-)";
-
-auto ServerArgs::parse(const int argc, const char* argv[]) -> std::optional<ServerArgs> {
-    auto ret = ServerArgs();
-    for(auto i = 1; i < argc; i += 1) {
-        const auto arg = std::string_view(argv[i]);
-        if(arg == "-h") {
-            ret.help = true;
-        } else if(arg == "-v") {
-            ret.verbose = true;
-        } else if(arg == "-wv") {
-            ret.websocket_verbose = true;
-        } else if(arg == "-wd") {
-            ret.websocket_dump_packets = true;
-        } else if(arg == "-wb") {
-            i += 1;
-            assert_o(i < argc);
-            unwrap_oo(value, from_chars<uint8_t>(argv[i]));
-            ret.libws_debug_bitmap = value;
-        } else {
-            assert_o("unknown argument");
-        }
+auto ServerArgs::parse(const int argc, const char* argv[], std::string_view program_name) -> std::optional<ServerArgs> {
+    auto args   = ServerArgs();
+    auto parser = args::Parser<uint8_t>();
+    parser.kwarg(&args.help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
+    parser.kwarg(&args.verbose, {"-v"}, {.arg_desc = "enable signaling server debug output", .state = args::State::Initialized});
+    parser.kwarg(&args.websocket_verbose, {"-wv"}, {.arg_desc = "enable websocket debug output", .state = args::State::Initialized});
+    parser.kwarg(&args.websocket_dump_packets, {"-wd"}, {.arg_desc = "dump every websocket packets", .state = args::State::Initialized});
+    parser.kwarg(&args.libws_debug_bitmap, {"-wd"}, {"BITMAP", "libwebsockets debug flag bitmap", args::State::DefaultValue});
+    if(!parser.parse(argc, argv) || args.help) {
+        print("usage: ", program_name, " ", parser.get_help());
+        std::exit(0);
     }
-    return ret;
+    return args;
 }

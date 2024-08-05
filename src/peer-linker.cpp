@@ -205,15 +205,10 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    const auto args = ServerArgs::parse(argc, argv);
-    if(!args || args->help) {
-        print("usage peer-linker (option)...");
-        print("options:", ServerArgs::usage);
-        return true;
-    }
+    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub"));
 
     auto server    = Server();
-    server.verbose = args->verbose;
+    server.verbose = args.verbose;
 
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
@@ -234,9 +229,9 @@ auto run(const int argc, const char* argv[]) -> bool {
         }
     };
     wsctx.session_data_initer.reset(new SessionDataInitializer(server));
-    wsctx.verbose      = args->websocket_verbose;
-    wsctx.dump_packets = args->websocket_dump_packets;
-    ws::set_log_level(args->libws_debug_bitmap);
+    wsctx.verbose      = args.websocket_verbose;
+    wsctx.dump_packets = args.websocket_dump_packets;
+    ws::set_log_level(args.libws_debug_bitmap);
     assert_b(wsctx.init({
         .protocol    = "peer-linker",
         .cert        = nullptr,
