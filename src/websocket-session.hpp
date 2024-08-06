@@ -3,8 +3,11 @@
 
 #include "event-manager.hpp"
 #include "protocol-helper.hpp"
-#include "util/event.hpp"
 #include "ws/client.hpp"
+
+#define CUTIL_NS p2p
+#include "util/event.hpp"
+#undef CUTIL_NS
 
 namespace p2p::wss {
 struct EventKind {
