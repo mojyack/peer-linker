@@ -20,6 +20,7 @@ struct EventKind {
 class IceSession : public plink::PeerLinkerSession {
   private:
     AutoJuiceAgent agent;
+    std::string    remote_sdp;
 
   protected:
     virtual auto on_packet_received(std::span<const std::byte> payload) -> bool override;

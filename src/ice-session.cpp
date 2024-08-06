@@ -43,7 +43,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         if(verbose) {
             PRINT("received remote candidates: ", sdp);
         }
-        juice_set_remote_description(agent.get(), sdp.data());
+        remote_sdp = sdp;
         events.invoke(EventKind::SDPSet, no_id, no_value);
 
         send_result(plink::proto::Type::Success, header.id);
@@ -135,6 +135,7 @@ auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
     agent.reset(juice_create(&config));
     if(controlled) {
         events->sdp_set.wait();
+        juice_set_remote_description(agent.get(), remote_sdp.data());
     }
 
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
@@ -143,6 +144,10 @@ auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
         PRINT(params.pad_name, "local sdp: ", sdp.data());
     }
     assert_b(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
+    if(!controlled) {
+        events->sdp_set.wait();
+        juice_set_remote_description(agent.get(), remote_sdp.data());
+    }
 
     juice_gather_candidates(agent.get());
     events->gathering_done.wait();
