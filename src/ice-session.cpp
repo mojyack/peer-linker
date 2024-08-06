@@ -103,8 +103,6 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
 }
 
 auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
-    assert_b(plink::PeerLinkerSession::start(params));
-
     struct Events {
         Event sdp_set;
         Event gathering_done;
@@ -115,6 +113,8 @@ auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
     add_event_handler(EventKind::SDPSet, [events](uint32_t) { events->sdp_set.notify(); });
     add_event_handler(EventKind::RemoteGatheringDone, [events](uint32_t) { events->gathering_done.notify(); });
     add_event_handler(EventKind::Connected, [events](uint32_t) { events->connected.notify(); });
+
+    assert_b(plink::PeerLinkerSession::start(params));
 
     const auto controlled = params.target_pad_name.empty();
 
