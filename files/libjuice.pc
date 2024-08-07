@@ -1,7 +1,0 @@
-prefix=${pcfiledir}/../..
-
-Name: libjuice
-Description: UDP Interactive Connectivity Establishment
-Version: 1.0.0
-Libs: -L${prefix}/lib -ljuice
-Cflags: -I${prefix}/include
