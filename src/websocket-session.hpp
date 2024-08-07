@@ -100,6 +100,6 @@ class WebSocketSession {
         websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
     }
 
-    virtual ~WebSocketSession(){};
+    virtual ~WebSocketSession() {}
 };
 } // namespace p2p::wss
