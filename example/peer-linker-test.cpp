@@ -5,8 +5,6 @@
 #include "p2p/ice-session.hpp"
 
 namespace {
-// const auto server_domain = "saver-local-jitsi";
-// const auto server_port   = 80;
 const auto server_domain = "localhost";
 const auto server_port   = 8080;
 
