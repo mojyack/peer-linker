@@ -9,7 +9,7 @@ auto ServerArgs::parse(const int argc, const char* argv[], std::string_view prog
     parser.kwarg(&args.verbose, {"-v"}, {.arg_desc = "enable signaling server debug output", .state = args::State::Initialized});
     parser.kwarg(&args.websocket_verbose, {"-wv"}, {.arg_desc = "enable websocket debug output", .state = args::State::Initialized});
     parser.kwarg(&args.websocket_dump_packets, {"-wd"}, {.arg_desc = "dump every websocket packets", .state = args::State::Initialized});
-    parser.kwarg(&args.libws_debug_bitmap, {"-wd"}, {"BITMAP", "libwebsockets debug flag bitmap", args::State::DefaultValue});
+    parser.kwarg(&args.libws_debug_bitmap, {"-wb"}, {"BITMAP", "libwebsockets debug flag bitmap", args::State::DefaultValue});
     if(!parser.parse(argc, argv) || args.help) {
         print("usage: ", program_name, " ", parser.get_help());
         std::exit(0);
