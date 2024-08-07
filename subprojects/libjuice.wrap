@@ -1,0 +1,9 @@
+[wrap-file]
+directory = libjuice-1.5.2
+source_url = https://github.com/paullouisageneau/libjuice/archive/refs/tags/v1.5.2.tar.gz
+source_filename = libjuice-1.5.2.tar.gz
+source_hash = 9b145cbf4c88829249b33cf6d8d92f575694d557d1b36e780b6903c10f7094b8
+method = cmake
+
+[provide]
+libjuice = juice_dep
