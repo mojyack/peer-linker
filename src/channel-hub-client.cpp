@@ -128,7 +128,7 @@ auto ChannelHubReceiver::get_channels() -> std::vector<std::string> {
     auto tail = channels_str.find('\0');
     while(tail != channels_str.npos) {
         channels.emplace_back(channels_str.substr(head, tail - head));
-        head = tail;
+        head = tail + 1;
         tail = channels_str.find('\0', tail + 1);
     }
 
