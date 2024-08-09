@@ -1,0 +1,3 @@
+[submodule "submodules/websocket-cpp"]
+	path = submodules/websocket-cpp
+	url = https://github.com/mojyack/websocket-cpp.git
