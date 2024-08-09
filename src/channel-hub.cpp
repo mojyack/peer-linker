@@ -51,6 +51,7 @@ struct Server {
     StringMap<Channel>                     channels;
     std::unordered_map<uint32_t, Session*> pending_sessions;
     uint32_t                               packet_id;
+    bool                                   verbose = false;
 
     template <class... Args>
     auto send_to(lws* wsi, uint16_t type, const uint32_t id, Args... args) -> bool;
@@ -180,12 +181,15 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 auto run(const int argc, const char* argv[]) -> bool {
     unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8081));
 
-    auto server = Server();
+    auto server    = Server();
+    server.verbose = args.verbose;
 
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
-        PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
+        if(server.verbose) {
+            PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
+        }
         if(!session.handle_payload(payload)) {
             WARN("payload handling failed");
 
