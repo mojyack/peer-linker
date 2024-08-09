@@ -1,6 +1,5 @@
 #include "macros/unwrap.hpp"
 #include "peer-linker-protocol.hpp"
-#include "server-args.hpp"
 #include "server.hpp"
 #include "util/string-map.hpp"
 
@@ -194,10 +193,9 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    unwrap_ob(args, ServerArgs::parse(argc, argv, "peer-linker", 8080));
     auto server = PeerLinker();
     auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
-    assert_b(run(args, server, std::move(initor), "peer-linker", proto::Type::Error));
+    assert_b(run(argc, argv, 8080, server, std::move(initor), "peer-linker", proto::Type::Error));
     return true;
 }
 } // namespace

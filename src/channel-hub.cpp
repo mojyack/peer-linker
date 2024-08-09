@@ -1,6 +1,5 @@
 #include "channel-hub-protocol.hpp"
 #include "macros/unwrap.hpp"
-#include "server-args.hpp"
 #include "server.hpp"
 #include "util/string-map.hpp"
 
@@ -165,10 +164,9 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8081));
     auto server = ChannelHub();
     auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
-    assert_b(run(args, server, std::move(initor), "channel-hub", proto::Type::Error));
+    assert_b(run(argc, argv, 8081, server, std::move(initor), "channel-hub", proto::Type::Error));
     return true;
 }
 } // namespace

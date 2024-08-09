@@ -1,5 +1,5 @@
+#pragma once
 #include "protocol-helper.hpp"
-#include "server-args.hpp"
 #include "ws/server.hpp"
 
 struct Session {
@@ -17,4 +17,9 @@ struct Server {
     }
 };
 
-auto run(const ServerArgs& args, Server& server, std::unique_ptr<ws::server::SessionDataInitializer> session_initer, const char* protocol, const uint16_t error_type) -> bool;
+auto run(int argc, const char* const* argv,
+         uint16_t                                            default_port,
+         Server&                                             server,
+         std::unique_ptr<ws::server::SessionDataInitializer> session_initer,
+         const char*                                         protocol,
+         uint16_t                                            error_type) -> bool;
