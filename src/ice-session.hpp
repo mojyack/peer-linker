@@ -17,6 +17,10 @@ struct EventKind {
     };
 };
 
+struct IceSessionParams {
+    wss::ServerLocation stun_server;
+};
+
 class IceSession : public plink::PeerLinkerSession {
   private:
     AutoJuiceAgent agent;
@@ -34,7 +38,7 @@ class IceSession : public plink::PeerLinkerSession {
     // api
     virtual auto on_p2p_packet_received(std::span<const std::byte> payload) -> void;
 
-    auto start(const plink::PeerLinkerSessionParams& params) -> bool;
+    auto start(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool;
     auto send_packet_p2p(const std::span<const std::byte> payload) -> bool;
 
     virtual ~IceSession() {}

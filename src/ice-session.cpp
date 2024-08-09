@@ -102,7 +102,7 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
     PRINT("p2p data received: ", payload.size(), " bytes");
 }
 
-auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
+auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool {
     struct Events {
         Event sdp_set;
         Event gathering_done;
@@ -114,14 +114,14 @@ auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
     add_event_handler(EventKind::RemoteGatheringDone, [events](uint32_t) { events->gathering_done.notify(); });
     add_event_handler(EventKind::Connected, [events](uint32_t) { events->connected.notify(); });
 
-    assert_b(plink::PeerLinkerSession::start(params));
+    assert_b(plink::PeerLinkerSession::start(plink_params));
 
-    const auto controlled = params.target_pad_name.empty();
+    const auto controlled = plink_params.target_pad_name.empty();
 
     auto config = juice_config_t{
         .stun_server_host  = params.stun_server.address.data(),
         .stun_server_port  = params.stun_server.port,
-        .bind_address      = params.bind_address,
+        .bind_address      = plink_params.bind_address,
         .cb_state_changed  = on_state_changed,
         .cb_candidate      = on_candidate,
         .cb_gathering_done = on_gathering_done,
@@ -141,7 +141,7 @@ auto IceSession::start(const plink::PeerLinkerSessionParams& params) -> bool {
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
     assert_b(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
     if(verbose) {
-        PRINT(params.pad_name, "local sdp: ", sdp.data());
+        PRINT(plink_params.pad_name, "local sdp: ", sdp.data());
     }
     assert_b(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
     if(!controlled) {

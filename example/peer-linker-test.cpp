@@ -26,10 +26,14 @@ auto main(bool a) -> bool {
     session.set_ws_debug_flags(true, true);
     const auto peer_linker = p2p::wss::ServerLocation{server_domain, server_port};
     const auto stun_server = p2p::wss::ServerLocation{"stun.l.google.com", 19302};
-    assert_b(session.start({.peer_linker     = peer_linker,
-                            .stun_server     = stun_server,
-                            .pad_name        = a ? "agent a" : "agent b",
-                            .target_pad_name = a ? "agent b" : ""}));
+    assert_b(session.start({
+                               .stun_server = stun_server,
+                           },
+                           {
+                               .peer_linker     = peer_linker,
+                               .pad_name        = a ? "agent a" : "agent b",
+                               .target_pad_name = a ? "agent b" : "",
+                           }));
     return true;
 }
 
