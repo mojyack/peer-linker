@@ -18,7 +18,8 @@ struct EventKind {
 };
 
 struct IceSessionParams {
-    wss::ServerLocation stun_server;
+    wss::ServerLocation              stun_server;
+    std::vector<juice_turn_server_t> turn_servers;
 };
 
 class IceSession : public plink::PeerLinkerSession {

@@ -128,6 +128,10 @@ auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSe
         .cb_recv           = on_recv,
         .user_ptr          = this,
     };
+    if(!params.turn_servers.empty()) {
+        config.turn_servers       = (juice_turn_server_t*)params.turn_servers.data();
+        config.turn_servers_count = params.turn_servers.size();
+    }
     if(controlled) {
         config.local_port_range_begin = 60000;
         config.local_port_range_end   = 61000;
