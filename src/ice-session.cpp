@@ -154,7 +154,8 @@ auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSe
     }
 
     juice_gather_candidates(agent.get());
-    events->gathering_done.wait();
+    // seems not mandatory
+    // events->gathering_done.wait();
     events->connected.wait();
     return is_connected();
 }
