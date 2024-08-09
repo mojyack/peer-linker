@@ -1,10 +1,9 @@
 #include "macros/unwrap.hpp"
 #include "peer-linker-protocol.hpp"
-#include "protocol-helper.hpp"
 #include "server-args.hpp"
+#include "server.hpp"
 #include "util/string-map.hpp"
 #include "ws/misc.hpp"
-#include "ws/server.hpp"
 
 namespace p2p::plink {
 namespace {
@@ -47,10 +46,8 @@ const auto estr = std::array{
 
 static_assert(Error::Limit == estr.size());
 
-struct Server {
-    ws::server::Context websocket_context;
-    StringMap<Pad>      pads;
-    bool                verbose = false;
+struct PeerLinker : Server {
+    StringMap<Pad> pads;
 
     auto remove_pad(Pad* pad) -> void {
         if(pad == nullptr) {
@@ -62,19 +59,12 @@ struct Server {
         }
         pads.erase(pad->name);
     }
-
-    template <class... Args>
-    auto send_to(lws* const wsi, const uint16_t type, const uint32_t id, Args... args) -> bool {
-        const auto packet = p2p::proto::build_packet(type, id, args...);
-        assert_b(websocket_context.send(wsi, packet));
-        return true;
-    }
 };
 
 struct Session {
-    Server* server;
-    lws*    wsi;
-    Pad*    pad = nullptr;
+    PeerLinker* server;
+    lws*        wsi;
+    Pad*        pad = nullptr;
 
     auto handle_payload(std::span<const std::byte> payload) -> bool;
 };
@@ -180,7 +170,7 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
 }
 
 struct SessionDataInitializer : ws::server::SessionDataInitializer {
-    Server* server;
+    PeerLinker* server;
 
     auto get_size() -> size_t override {
         return sizeof(Session);
@@ -200,14 +190,14 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         session.~Session();
     }
 
-    SessionDataInitializer(Server& server)
+    SessionDataInitializer(PeerLinker& server)
         : server(&server) {}
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
     unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8080));
 
-    auto server    = Server();
+    auto server    = PeerLinker();
     server.verbose = args.verbose;
 
     auto& wsctx   = server.websocket_context;

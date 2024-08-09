@@ -1,10 +1,9 @@
 #include "channel-hub-protocol.hpp"
 #include "macros/unwrap.hpp"
-#include "protocol-helper.hpp"
 #include "server-args.hpp"
+#include "server.hpp"
 #include "util/string-map.hpp"
 #include "ws/misc.hpp"
-#include "ws/server.hpp"
 
 namespace p2p::chub {
 namespace {
@@ -37,24 +36,19 @@ const auto estr = std::array{
 
 static_assert(Error::Limit == estr.size());
 
-struct Server;
+struct ChannelHub;
 
 struct Session {
-    Server* server;
-    lws*    wsi;
+    ChannelHub* server;
+    lws*        wsi;
 
     auto handle_payload(std::span<const std::byte> payload) -> bool;
 };
 
-struct Server {
-    ws::server::Context                    websocket_context;
+struct ChannelHub : Server {
     StringMap<Channel>                     channels;
     std::unordered_map<uint32_t, Session*> pending_sessions;
     uint32_t                               packet_id;
-    bool                                   verbose = false;
-
-    template <class... Args>
-    auto send_to(lws* wsi, uint16_t type, const uint32_t id, Args... args) -> bool;
 };
 
 auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
@@ -140,15 +134,8 @@ auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
     return true;
 }
 
-template <class... Args>
-auto Server::send_to(lws* const wsi, const uint16_t type, const uint32_t id, Args... args) -> bool {
-    const auto packet = p2p::proto::build_packet(type, id, args...);
-    assert_b(websocket_context.send(wsi, packet));
-    return true;
-}
-
 struct SessionDataInitializer : ws::server::SessionDataInitializer {
-    Server* server;
+    ChannelHub* server;
 
     auto get_size() -> size_t override {
         return sizeof(Session);
@@ -174,14 +161,14 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         session.~Session();
     }
 
-    SessionDataInitializer(Server& server)
+    SessionDataInitializer(ChannelHub& server)
         : server(&server) {}
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
     unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8081));
 
-    auto server    = Server();
+    auto server    = ChannelHub();
     server.verbose = args.verbose;
 
     auto& wsctx   = server.websocket_context;
