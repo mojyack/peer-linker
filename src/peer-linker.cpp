@@ -3,7 +3,6 @@
 #include "server-args.hpp"
 #include "server.hpp"
 #include "util/string-map.hpp"
-#include "ws/misc.hpp"
 
 namespace p2p::plink {
 namespace {
@@ -61,15 +60,15 @@ struct PeerLinker : Server {
     }
 };
 
-struct Session {
+struct PeerLinkerSession : Session {
     PeerLinker* server;
     lws*        wsi;
     Pad*        pad = nullptr;
 
-    auto handle_payload(std::span<const std::byte> payload) -> bool;
+    auto handle_payload(std::span<const std::byte> payload) -> bool override;
 };
 
-auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
+auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, p2p::proto::extract_header(payload));
     switch(header.type) {
     case proto::Type::Register: {
@@ -173,21 +172,21 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
     PeerLinker* server;
 
     auto get_size() -> size_t override {
-        return sizeof(Session);
+        return sizeof(PeerLinkerSession);
     }
 
     auto init(void* const ptr, lws* wsi) -> void override {
         PRINT("session created: ", ptr);
-        auto& session  = *new(ptr) Session();
+        auto& session  = *new(ptr) PeerLinkerSession();
         session.server = server;
         session.wsi    = wsi;
     }
 
     auto deinit(void* const ptr) -> void override {
         PRINT("session destroyed: ", ptr);
-        auto& session = *std::bit_cast<Session*>(ptr);
+        auto& session = *std::bit_cast<PeerLinkerSession*>(ptr);
         server->remove_pad(session.pad);
-        session.~Session();
+        session.~PeerLinkerSession();
     }
 
     SessionDataInitializer(PeerLinker& server)
@@ -195,43 +194,10 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8080));
-
-    auto server    = PeerLinker();
-    server.verbose = args.verbose;
-
-    auto& wsctx   = server.websocket_context;
-    wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
-        auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
-        if(server.verbose) {
-            PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
-        }
-        if(!session.handle_payload(payload)) {
-            WARN("payload handling failed");
-
-            const auto& header_o = p2p::proto::extract_header(payload);
-            if(!header_o) {
-                WARN("packet too short");
-                assert_n(server.send_to(wsi, proto::Type::Error, 0));
-            } else {
-                assert_n(server.send_to(wsi, proto::Type::Error, header_o->id));
-            }
-        }
-    };
-    wsctx.session_data_initer.reset(new SessionDataInitializer(server));
-    wsctx.verbose      = args.websocket_verbose;
-    wsctx.dump_packets = args.websocket_dump_packets;
-    ws::set_log_level(args.libws_debug_bitmap);
-    assert_b(wsctx.init({
-        .protocol    = "peer-linker",
-        .cert        = nullptr,
-        .private_key = nullptr,
-        .port        = args.port,
-    }));
-    print("ready");
-    while(wsctx.state == ws::server::State::Connected) {
-        wsctx.process();
-    }
+    unwrap_ob(args, ServerArgs::parse(argc, argv, "peer-linker", 8080));
+    auto server = PeerLinker();
+    auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
+    assert_b(run(args, server, std::move(initor), "peer-linker", proto::Type::Error));
     return true;
 }
 } // namespace

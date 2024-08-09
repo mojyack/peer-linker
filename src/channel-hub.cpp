@@ -3,7 +3,6 @@
 #include "server-args.hpp"
 #include "server.hpp"
 #include "util/string-map.hpp"
-#include "ws/misc.hpp"
 
 namespace p2p::chub {
 namespace {
@@ -38,20 +37,20 @@ static_assert(Error::Limit == estr.size());
 
 struct ChannelHub;
 
-struct Session {
+struct ChannelHubSession : Session {
     ChannelHub* server;
     lws*        wsi;
 
-    auto handle_payload(std::span<const std::byte> payload) -> bool;
+    auto handle_payload(std::span<const std::byte> payload) -> bool override;
 };
 
 struct ChannelHub : Server {
-    StringMap<Channel>                     channels;
-    std::unordered_map<uint32_t, Session*> pending_sessions;
-    uint32_t                               packet_id;
+    StringMap<Channel>                               channels;
+    std::unordered_map<uint32_t, ChannelHubSession*> pending_sessions;
+    uint32_t                                         packet_id;
 };
 
-auto Session::handle_payload(const std::span<const std::byte> payload) -> bool {
+auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, p2p::proto::extract_header(payload));
     switch(header.type) {
     case proto::Type::Success:
@@ -138,19 +137,19 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
     ChannelHub* server;
 
     auto get_size() -> size_t override {
-        return sizeof(Session);
+        return sizeof(ChannelHubSession);
     }
 
     auto init(void* const ptr, lws* wsi) -> void override {
         PRINT("session created: ", ptr);
-        auto& session  = *new(ptr) Session();
+        auto& session  = *new(ptr) ChannelHubSession();
         session.server = server;
         session.wsi    = wsi;
     }
 
     auto deinit(void* const ptr) -> void override {
         PRINT("session destroyed: ", ptr);
-        auto& session = *std::bit_cast<Session*>(ptr);
+        auto& session = *std::bit_cast<ChannelHubSession*>(ptr);
 
         // remove corresponding channels
         std::erase_if(server->channels, [&session](const auto& p) { return p.second.wsi == session.wsi; });
@@ -158,7 +157,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         // remove from pending list
         std::erase_if(server->pending_sessions, [&session](const auto& p) { return p.second->wsi == session.wsi; });
 
-        session.~Session();
+        session.~ChannelHubSession();
     }
 
     SessionDataInitializer(ChannelHub& server)
@@ -167,42 +166,9 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 
 auto run(const int argc, const char* argv[]) -> bool {
     unwrap_ob(args, ServerArgs::parse(argc, argv, "channel-hub", 8081));
-
-    auto server    = ChannelHub();
-    server.verbose = args.verbose;
-
-    auto& wsctx   = server.websocket_context;
-    wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
-        auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
-        if(server.verbose) {
-            PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
-        }
-        if(!session.handle_payload(payload)) {
-            WARN("payload handling failed");
-
-            const auto& header_o = p2p::proto::extract_header(payload);
-            if(!header_o) {
-                WARN("packet too short");
-                assert_n(server.send_to(wsi, proto::Type::Error, 0));
-            } else {
-                assert_n(server.send_to(wsi, proto::Type::Error, header_o->id));
-            }
-        }
-    };
-    wsctx.session_data_initer.reset(new SessionDataInitializer(server));
-    wsctx.verbose      = args.websocket_verbose;
-    wsctx.dump_packets = args.websocket_dump_packets;
-    ws::set_log_level(args.libws_debug_bitmap);
-    assert_b(wsctx.init({
-        .protocol    = "channel-hub",
-        .cert        = nullptr,
-        .private_key = nullptr,
-        .port        = args.port,
-    }));
-    print("ready");
-    while(wsctx.state == ws::server::State::Connected) {
-        wsctx.process();
-    }
+    auto server = ChannelHub();
+    auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
+    assert_b(run(args, server, std::move(initor), "channel-hub", proto::Type::Error));
     return true;
 }
 } // namespace

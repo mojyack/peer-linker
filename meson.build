@@ -11,11 +11,13 @@ endif
 peer_linker_files = files(
   'src/peer-linker.cpp',
   'src/server-args.cpp',
+  'src/server.cpp',
 ) + ws_files + ws_server_files
 
 channel_hub_files = files(
   'src/channel-hub.cpp',
   'src/server-args.cpp',
+  'src/server.cpp',
 ) + ws_files + ws_server_files
 
 executable('peer-linker', peer_linker_files, dependencies : ws_deps)
