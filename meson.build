@@ -15,15 +15,18 @@ session_key_files = files(
   'src/crypto/base64.cpp',
 )
 
+server_files = files(
+  'src/server.cpp',
+  'src/spawn/process.cpp',
+) + session_key_files + ws_files + ws_server_files
+
 peer_linker_files = files(
   'src/peer-linker.cpp',
-  'src/server.cpp',
-) + session_key_files + ws_files + ws_server_files
+) + server_files
 
 channel_hub_files = files(
   'src/channel-hub.cpp',
-  'src/server.cpp',
-) + session_key_files + ws_files + ws_server_files
+) + server_files
 
 executable('peer-linker', peer_linker_files, dependencies : ws_deps + crypto_utils_deps)
 executable('channel-hub', channel_hub_files, dependencies : ws_deps + crypto_utils_deps)

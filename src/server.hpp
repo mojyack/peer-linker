@@ -6,6 +6,7 @@
 struct Server {
     ws::server::Context       websocket_context;
     std::optional<SessionKey> session_key;
+    std::string               user_cert_verifier;
     bool                      verbose = false;
 
     template <class... Args>

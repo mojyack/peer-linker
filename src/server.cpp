@@ -1,10 +1,12 @@
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string_view>
 
 #include "macros/unwrap.hpp"
 #include "protocol-helper.hpp"
 #include "server.hpp"
+#include "spawn/process.hpp"
 #include "util/argument-parser.hpp"
 #include "util/file-io.hpp"
 #include "ws/misc.hpp"
@@ -14,6 +16,23 @@ auto Session::activate(Server& server, const std::string_view cert) -> bool {
         unwrap_ob(parsed, key->split_user_certificate_to_hash_and_content(cert));
         const auto [hash_str, content] = parsed;
         assert_b(key->verify_user_certificate_hash(hash_str, content));
+
+        if(!server.user_cert_verifier.empty()) {
+            auto cont = std::string(content);
+            auto args = std::vector<const char*>{server.user_cert_verifier.data(), cont.data(), nullptr};
+
+            auto process      = process::Process();
+            auto on_output    = [](const std::span<const char> output) { std::cout << "verifier: " << std::string_view(output.data(), output.size()); };
+            process.on_stdout = on_output;
+            process.on_stderr = on_output;
+            assert_b(process.start(args), "failed to launch verifier");
+            while(process.get_status() == process::Status::Running) {
+                process.collect_outputs();
+            }
+            unwrap_ob(result, process.join());
+            assert_b(result.reason == process::Result::ExitReason::Exit, "verifier exitted abnormally");
+            assert_b(result.code == 0, "verifier returned non-zero code: ", result.code);
+        }
     }
     activated = true;
     return true;
@@ -21,6 +40,7 @@ auto Session::activate(Server& server, const std::string_view cert) -> bool {
 
 struct ServerArgs {
     const char* session_key_secret_file = nullptr;
+    const char* user_cert_verifier      = nullptr;
     const char* ssl_cert_file           = nullptr;
     const char* ssl_key_file            = nullptr;
     uint16_t    port                    = 0;
@@ -39,6 +59,7 @@ auto ServerArgs::parse(const int argc, const char* const* const argv, std::strin
     parser.kwarg(&args.help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
     parser.kwarg(&args.port, {"-p"}, {"PORT", "port number to use", args::State::DefaultValue});
     parser.kwarg(&args.session_key_secret_file, {"-k", "--key"}, {"FILE", "enable user verification with the secret file", args::State::Initialized});
+    parser.kwarg(&args.user_cert_verifier, {"-c", "--cert-verifier"}, {"EXEC", "full-path of executable to verify user certificate", args::State::Initialized});
     parser.kwarg(&args.ssl_cert_file, {"-sc", "--ssl-cert"}, {"FILE", "ssl certificate file", args::State::Initialized});
     parser.kwarg(&args.ssl_key_file, {"-sk", "--ssl-key"}, {"FILE", "ssk private key file", args::State::Initialized});
     parser.kwarg(&args.verbose, {"-v"}, {.arg_desc = "enable signaling server debug output", .state = args::State::Initialized});
@@ -62,7 +83,8 @@ auto run(const int argc, const char* const* const argv,
         unwrap_ob(secret, read_file(args.session_key_secret_file), "failed to read session key secret file");
         server.session_key.emplace(secret);
     }
-    server.verbose = args.verbose;
+    server.user_cert_verifier = std::filesystem::absolute(args.user_cert_verifier).string();
+    server.verbose            = args.verbose;
 
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
