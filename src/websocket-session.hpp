@@ -23,6 +23,12 @@ struct ServerLocation {
     uint16_t    port;
 };
 
+struct WebSocketSessionParams {
+    ServerLocation server;
+    const char*    protocol;
+    const char*    bind_address = nullptr;
+};
+
 class WebSocketSession {
   private:
     ws::client::Context websocket_context;
@@ -47,7 +53,7 @@ class WebSocketSession {
   public:
     bool verbose = false;
 
-    auto start(ServerLocation server, std::string protocol, const char* bind_address = nullptr) -> bool;
+    auto start(const WebSocketSessionParams& params) -> bool;
     auto stop() -> void;
     auto set_ws_debug_flags(bool verbose, bool dump_packets) -> void;
 

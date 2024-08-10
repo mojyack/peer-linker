@@ -55,7 +55,7 @@ auto WebSocketSession::destroy() -> void {
     }
 }
 
-auto WebSocketSession::start(const ServerLocation server, std::string protocol, const char* bind_address) -> bool {
+auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
         if(verbose) {
             PRINT("received ", payload.size(), " bytes");
@@ -63,12 +63,12 @@ auto WebSocketSession::start(const ServerLocation server, std::string protocol, 
         handle_raw_packet(payload);
     };
     assert_b(websocket_context.init({
-        .address      = server.address.data(),
+        .address      = params.server.address.data(),
         .path         = "/",
-        .protocol     = protocol.data(),
+        .protocol     = params.protocol,
         .cert         = nullptr,
-        .bind_address = bind_address,
-        .port         = server.port,
+        .bind_address = params.bind_address,
+        .port         = params.server.port,
         .ssl_level    = ws::client::SSLLevel::Disable, // TODO: enable ssl
     }));
     signaling_worker = std::thread([this]() -> void {

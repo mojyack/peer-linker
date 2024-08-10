@@ -52,7 +52,11 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
 }
 
 auto PeerLinkerSession::start(const PeerLinkerSessionParams& params) -> bool {
-    assert_b(wss::WebSocketSession::start(params.peer_linker, "peer-linker", params.bind_address));
+    assert_b(wss::WebSocketSession::start({
+        .server       = params.peer_linker,
+        .protocol     = "peer-linker",
+        .bind_address = params.bind_address,
+    }));
 
     struct Events {
         Event linked;

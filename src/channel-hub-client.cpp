@@ -17,7 +17,10 @@ struct EventKind {
 
 // ChannelHubSession
 auto ChannelHubSession::start(const wss::ServerLocation channel_hub, const std::string_view user_cert) -> bool {
-    assert_b(wss::WebSocketSession::start(channel_hub, "channel-hub"));
+    assert_b(wss::WebSocketSession::start({
+        .server   = channel_hub,
+        .protocol = "channel-hub",
+    }));
     assert_b(send_packet(::p2p::proto::Type::ActivateSession, user_cert));
     return true;
 }
