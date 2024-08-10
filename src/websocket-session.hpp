@@ -24,9 +24,11 @@ struct ServerLocation {
 };
 
 struct WebSocketSessionParams {
-    ServerLocation server;
-    const char*    protocol;
-    const char*    bind_address = nullptr;
+    ServerLocation       server;
+    ws::client::SSLLevel ssl_level = ws::client::SSLLevel::Enable;
+    const char*          protocol;
+    const char*          bind_address = nullptr;
+    const char*          ssl_cert     = nullptr;
 };
 
 class WebSocketSession {
