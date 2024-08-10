@@ -8,9 +8,10 @@
 #include "util/span.hpp"
 
 namespace {
-const auto server_domain = "localhost";
-const auto server_port   = 8080;
-auto       user_cert     = std::string();
+const auto server_domain     = "localhost";
+const auto server_port       = 8080;
+auto       user_cert         = std::string();
+auto       allow_self_signed = false;
 
 class ClientSession : public p2p::ice::IceSession {
     auto get_auth_secret() -> std::vector<std::byte> override {
@@ -24,7 +25,7 @@ class ClientSession : public p2p::ice::IceSession {
     }
 };
 
-auto main(bool controlling) -> bool {
+auto main(const bool controlling) -> bool {
     auto session    = ClientSession();
     session.verbose = true;
     session.set_ws_debug_flags(true, true);
@@ -34,10 +35,11 @@ auto main(bool controlling) -> bool {
                                .stun_server = stun_server,
                            },
                            {
-                               .peer_linker      = peer_linker,
-                               .pad_name         = controlling ? "agent a" : "agent b",
-                               .target_pad_name  = controlling ? "agent b" : "",
-                               .user_certificate = user_cert,
+                               .peer_linker                   = peer_linker,
+                               .pad_name                      = controlling ? "agent a" : "agent b",
+                               .target_pad_name               = controlling ? "agent b" : "",
+                               .user_certificate              = user_cert,
+                               .peer_linker_allow_self_signed = allow_self_signed,
                            }));
     return true;
 }
@@ -50,6 +52,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
     auto parser = args::Parser<uint16_t, uint8_t>();
     parser.kwarg(&help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
     parser.kwarg(&cert_file, {"-k"}, {"CERT_FILE", "use user certificate", args::State::Initialized});
+    parser.kwarg(&allow_self_signed, {"-a"}, {"", "allow self signed ssl certificate", args::State::Initialized});
     parser.kwarg(&role, {"-r", "--role"}, {"ROLE(both|server|client)", "test target", args::State::DefaultValue});
     if(!parser.parse(argc, argv) || help) {
         print("usage: peer-linker-test ", parser.get_help());
