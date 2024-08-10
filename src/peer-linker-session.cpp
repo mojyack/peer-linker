@@ -54,10 +54,9 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
 auto PeerLinkerSession::start(const PeerLinkerSessionParams& params) -> bool {
     assert_b(wss::WebSocketSession::start({
         .server       = params.peer_linker,
-        .ssl_level    = params.peer_linker_ssl_cert != nullptr ? ws::client::SSLLevel::TrustSelfSigned : ws::client::SSLLevel::Enable,
+        .ssl_level    = params.peer_linker_allow_self_signed ? ws::client::SSLLevel::TrustSelfSigned : ws::client::SSLLevel::Enable,
         .protocol     = "peer-linker",
         .bind_address = params.bind_address,
-        .ssl_cert     = params.peer_linker_ssl_cert,
     }));
 
     struct Events {

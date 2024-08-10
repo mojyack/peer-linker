@@ -66,7 +66,7 @@ auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
         .address      = params.server.address.data(),
         .path         = "/",
         .protocol     = params.protocol,
-        .cert         = params.ssl_cert,
+        .cert         = nullptr,
         .bind_address = params.bind_address,
         .port         = params.server.port,
         .ssl_level    = params.ssl_level,
