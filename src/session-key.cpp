@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "crypto/base64.hpp"
 #include "crypto/hmac.hpp"
 #include "macros/unwrap.hpp"
