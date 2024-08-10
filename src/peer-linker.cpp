@@ -85,7 +85,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
     switch(header.type) {
     case proto::Type::Register: {
         const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
-        PRINT("received pad register request name:", name);
+        PRINT("received pad register request name: ", name);
 
         assert_b(!name.empty(), estr[Error::EmptyPadName]);
         assert_b(pad == nullptr, estr[Error::AlreadyRegistered]);
