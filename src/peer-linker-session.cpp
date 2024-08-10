@@ -3,10 +3,6 @@
 #include "peer-linker-protocol.hpp"
 
 namespace p2p::plink {
-auto PeerLinkerSession::get_error_packet_type() const -> uint16_t {
-    return proto::Type::Error;
-}
-
 auto PeerLinkerSession::on_pad_created() -> void {
     PRINT("pad created");
 }
@@ -23,12 +19,6 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
     unwrap_pb(header, p2p::proto::extract_header(payload));
 
     switch(header.type) {
-    case proto::Type::Success:
-        events.invoke(wss::EventKind::Result, header.id, 1);
-        return true;
-    case proto::Type::Error:
-        events.invoke(wss::EventKind::Result, header.id, 0);
-        return true;
     case proto::Type::Unlinked:
         stop();
         return true;
@@ -57,8 +47,7 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
         stop();
         return true;
     default:
-        WARN("unhandled payload type ", int(header.type));
-        return false;
+        return wss::WebSocketSession::on_packet_received(payload);
     }
 }
 

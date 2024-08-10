@@ -4,18 +4,15 @@
 namespace p2p::chub::proto {
 struct Type {
     enum : uint16_t {
-        Success,
-        Error,
-        Register,            // server <-  sender => (Success|Error)  register channel
-        Unregister,          // server <-  sender => (Success|Error)  unregister channel
-        GetChannels,         // server <-  receiver => (GetChannelsResponse|Error)  query registered channels
-        GetChannelsResponse, // server ->  receiver => ()  registered channels
-        PadRequest,          // server <-  receiver => (Success|Error)  ask server to send pad request to a channel
-                             // server  -> sender => (PadRequestResponse) request new pad
-        PadRequestResponse,  // server <-  sender => (Success|Error)  ask server to notify receiver creation of pad
-                             // server  -> receiver => () registered pad name
+        Register = ::p2p::proto::Type::Limit, // server <-  sender => (Success|Error)  register channel
+        Unregister,                           // server <-  sender => (Success|Error)  unregister channel
+        GetChannels,                          // server <-  receiver => (GetChannelsResponse|Error)  query registered channels
+        GetChannelsResponse,                  // server ->  receiver => ()  registered channels
+        PadRequest,                           // server <-  receiver => (Success|Error)  ask server to send pad request to a channel
+                                              // server  -> sender => (PadRequestResponse) request new pad
+        PadRequestResponse,                   // server <-  sender => (Success|Error)  ask server to notify receiver creation of pad
+                                              // server  -> receiver => () registered pad name
 
-        // marker
         Limit,
     };
 };

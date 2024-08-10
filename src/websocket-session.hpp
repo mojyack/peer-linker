@@ -36,8 +36,7 @@ class WebSocketSession {
   protected:
     Events events;
 
-    virtual auto get_error_packet_type() const -> uint16_t                      = 0;
-    virtual auto on_packet_received(std::span<const std::byte> payload) -> bool = 0;
+    virtual auto on_packet_received(std::span<const std::byte> payload) -> bool;
     virtual auto on_disconnected() -> void;
 
     auto is_connected() const -> bool;

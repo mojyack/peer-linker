@@ -163,7 +163,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
     }
     }
 
-    assert_b(server->send_to(wsi, proto::Type::Success, header.id));
+    assert_b(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
     return true;
 }
 
@@ -195,7 +195,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 auto run(const int argc, const char* argv[]) -> bool {
     auto server = PeerLinker();
     auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
-    assert_b(run(argc, argv, 8080, server, std::move(initor), "peer-linker", proto::Type::Error));
+    assert_b(run(argc, argv, 8080, server, std::move(initor), "peer-linker"));
     return true;
 }
 } // namespace

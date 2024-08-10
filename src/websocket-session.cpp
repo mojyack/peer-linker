@@ -1,7 +1,23 @@
 #include "websocket-session.hpp"
-#include "macros/assert.hpp"
+#include "macros/unwrap.hpp"
 
 namespace p2p::wss {
+auto WebSocketSession::on_packet_received(const std::span<const std::byte> payload) -> bool {
+    unwrap_pb(header, ::p2p::proto::extract_header(payload));
+
+    switch(header.type) {
+    case ::p2p::proto::Type::Success:
+        events.invoke(wss::EventKind::Result, header.id, 1);
+        return true;
+    case ::p2p::proto::Type::Error:
+        events.invoke(wss::EventKind::Result, header.id, 0);
+        return true;
+    default:
+        WARN("unhandled payload type ", int(header.type));
+        return false;
+    }
+}
+
 auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> void {
     if(!on_packet_received(payload)) {
         WARN("payload handling failed");
@@ -9,9 +25,9 @@ auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> 
         const auto& header_o = p2p::proto::extract_header(payload);
         if(!header_o) {
             WARN("packet too short");
-            send_result(get_error_packet_type(), 0);
+            send_result(::p2p::proto::Type::Error, 0);
         } else {
-            send_result(get_error_packet_type(), header_o->id);
+            send_result(::p2p::proto::Type::Error, header_o->id);
         }
     }
 }

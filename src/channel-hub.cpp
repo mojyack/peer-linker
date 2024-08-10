@@ -52,8 +52,8 @@ struct ChannelHub : Server {
 auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, p2p::proto::extract_header(payload));
     switch(header.type) {
-    case proto::Type::Success:
-    case proto::Type::Error:
+    case ::p2p::proto::Type::Success:
+    case ::p2p::proto::Type::Error:
         WARN("unexpected packet");
         return true;
     case proto::Type::Register: {
@@ -128,7 +128,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
     }
     }
 
-    assert_b(server->send_to(wsi, proto::Type::Success, header.id));
+    assert_b(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
     return true;
 }
 
@@ -166,7 +166,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 auto run(const int argc, const char* argv[]) -> bool {
     auto server = ChannelHub();
     auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
-    assert_b(run(argc, argv, 8081, server, std::move(initor), "channel-hub", proto::Type::Error));
+    assert_b(run(argc, argv, 8081, server, std::move(initor), "channel-hub"));
     return true;
 }
 } // namespace

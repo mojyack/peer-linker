@@ -5,9 +5,6 @@
 
 namespace p2p::chub {
 class ChannelHubSession : public wss::WebSocketSession {
-  private:
-    auto get_error_packet_type() const -> uint16_t override;
-
   public:
     auto start(wss::ServerLocation channel_hub) -> bool;
 

@@ -16,10 +16,6 @@ struct EventKind {
 };
 
 // ChannelHubSession
-auto ChannelHubSession::get_error_packet_type() const -> uint16_t {
-    return proto::Type::Error;
-}
-
 auto ChannelHubSession::start(const wss::ServerLocation channel_hub) -> bool {
     assert_b(wss::WebSocketSession::start(channel_hub, "channel-hub"));
     return true;
@@ -34,10 +30,10 @@ auto ChannelHubSender::on_packet_received(const std::span<const std::byte> paylo
     unwrap_pb(header, ::p2p::proto::extract_header(payload));
 
     switch(header.type) {
-    case proto::Type::Success:
+    case ::p2p::proto::Type::Success:
         events.invoke(wss::EventKind::Result, header.id, 1);
         return true;
-    case proto::Type::Error:
+    case ::p2p::proto::Type::Error:
         events.invoke(wss::EventKind::Result, header.id, 0);
         return true;
     case proto::Type::PadRequest: {
@@ -48,8 +44,7 @@ auto ChannelHubSender::on_packet_received(const std::span<const std::byte> paylo
         return true;
     }
     default:
-        WARN("unhandled payload type ", int(header.type));
-        return false;
+        return wss::WebSocketSession::on_packet_received(payload);
     }
 }
 
@@ -86,12 +81,6 @@ auto ChannelHubReceiver::on_packet_received(const std::span<const std::byte> pay
     unwrap_pb(header, ::p2p::proto::extract_header(payload));
 
     switch(header.type) {
-    case proto::Type::Success:
-        events.invoke(wss::EventKind::Result, header.id, 1);
-        return true;
-    case proto::Type::Error:
-        events.invoke(wss::EventKind::Result, header.id, 0);
-        return true;
     case proto::Type::GetChannelsResponse: {
         const auto channels = ::p2p::proto::extract_last_string<proto::GetChannelsResponse>(payload);
         // TODO: use packet id
@@ -107,8 +96,7 @@ auto ChannelHubReceiver::on_packet_received(const std::span<const std::byte> pay
         return true;
     }
     default:
-        WARN("unhandled payload type ", int(header.type));
-        return false;
+        return wss::WebSocketSession::on_packet_received(payload);
     }
 }
 

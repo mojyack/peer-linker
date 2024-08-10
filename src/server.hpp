@@ -21,5 +21,4 @@ auto run(int argc, const char* const* argv,
          uint16_t                                            default_port,
          Server&                                             server,
          std::unique_ptr<ws::server::SessionDataInitializer> session_initer,
-         const char*                                         protocol,
-         uint16_t                                            error_type) -> bool;
+         const char*                                         protocol) -> bool;

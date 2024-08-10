@@ -18,9 +18,6 @@ struct PeerLinkerSessionParams {
 };
 
 class PeerLinkerSession : public wss::WebSocketSession {
-  private:
-    auto get_error_packet_type() const -> uint16_t override;
-
   protected:
     virtual auto on_pad_created() -> void;
     virtual auto get_auth_secret() -> std::vector<std::byte>;

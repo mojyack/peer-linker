@@ -2,6 +2,15 @@
 #include <cstdint>
 
 namespace p2p::proto {
+struct Type {
+    enum : uint16_t {
+        Success,
+        Error,
+
+        Limit,
+    };
+};
+
 struct Packet {
     uint16_t size; // total size in bytes, including this header
     uint16_t type;

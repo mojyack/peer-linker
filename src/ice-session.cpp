@@ -46,7 +46,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         remote_sdp = sdp;
         events.invoke(EventKind::SDPSet, no_id, no_value);
 
-        send_result(plink::proto::Type::Success, header.id);
+        send_result(::p2p::proto::Type::Success, header.id);
         return true;
     }
     case proto::Type::AddCandidates: {
@@ -56,7 +56,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         }
         juice_add_remote_candidate(agent.get(), sdp.data());
 
-        send_result(plink::proto::Type::Success, header.id);
+        send_result(::p2p::proto::Type::Success, header.id);
         return true;
     }
     case proto::Type::GatheringDone: {
@@ -66,7 +66,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
         juice_set_remote_gathering_done(agent.get());
         events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
 
-        send_result(plink::proto::Type::Success, header.id);
+        send_result(::p2p::proto::Type::Success, header.id);
         return true;
     }
     default:
