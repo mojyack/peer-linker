@@ -1,12 +1,16 @@
 #include <cstring>
 #include <thread>
 
-#include "macros/assert.hpp"
+#include "macros/unwrap.hpp"
 #include "p2p/ice-session.hpp"
+#include "util/argument-parser.hpp"
+#include "util/file-io.hpp"
+#include "util/span.hpp"
 
 namespace {
 const auto server_domain = "localhost";
 const auto server_port   = 8080;
+auto       user_cert     = std::string();
 
 class ClientSession : public p2p::ice::IceSession {
     auto get_auth_secret() -> std::vector<std::byte> override {
@@ -20,7 +24,7 @@ class ClientSession : public p2p::ice::IceSession {
     }
 };
 
-auto main(bool a) -> bool {
+auto main(bool controlling) -> bool {
     auto session    = ClientSession();
     session.verbose = true;
     session.set_ws_debug_flags(true, true);
@@ -30,32 +34,51 @@ auto main(bool a) -> bool {
                                .stun_server = stun_server,
                            },
                            {
-                               .peer_linker     = peer_linker,
-                               .pad_name        = a ? "agent a" : "agent b",
-                               .target_pad_name = a ? "agent b" : "",
+                               .peer_linker      = peer_linker,
+                               .pad_name         = controlling ? "agent a" : "agent b",
+                               .target_pad_name  = controlling ? "agent b" : "",
+                               .user_certificate = user_cert,
                            }));
     return true;
 }
 
-auto run() -> bool {
-    auto t2 = std::thread(main, false);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    auto t1 = std::thread(main, true);
-    t2.join();
-    t1.join();
+auto run(const int argc, const char* const* const argv) -> bool {
+    auto role      = "both";
+    auto cert_file = (const char*)(nullptr);
+    auto help      = false;
+
+    auto parser = args::Parser<uint16_t, uint8_t>();
+    parser.kwarg(&help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
+    parser.kwarg(&cert_file, {"-k"}, {"CERT_FILE", "use user certificate", args::State::Initialized});
+    parser.kwarg(&role, {"-r", "--role"}, {"ROLE(both|server|client)", "test target", args::State::DefaultValue});
+    if(!parser.parse(argc, argv) || help) {
+        print("usage: peer-linker-test ", parser.get_help());
+        return true;
+    }
+
+    if(cert_file != nullptr) {
+        unwrap_ob(cert, read_file(cert_file));
+        user_cert = from_span(cert);
+    }
+
+    if(const auto r = std::string_view(role); r == "both") {
+        auto t2 = std::thread(main, false);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        auto t1 = std::thread(main, true);
+        t2.join();
+        t1.join();
+    } else if(r == "server") {
+        assert_b(main(false));
+    } else if(r == "client") {
+        assert_b(main(true));
+    } else {
+        assert_b(false, "invalid role");
+    }
 
     return true;
 }
 } // namespace
 
-auto main(const int argc, const char* argv[]) -> int {
-    if(argc < 2) {
-        return run() ? 0 : 1;
-    } else if(argv[1][0] == 'a') {
-        return main(true) ? 0 : 1;
-    } else if(argv[1][0] == 'b') {
-        return main(false) ? 0 : 1;
-    } else {
-        return run() ? 0 : 1;
-    }
+auto main(const int argc, const char* const* const argv) -> int {
+    return run(argc, argv) ? 0 : 1;
 }
