@@ -9,24 +9,27 @@ else
 endif
 subdir('src/crypto')
 
+session_key_files = files(
+  'src/session-key.cpp',
+  'src/crypto/hmac.cpp',
+  'src/crypto/base64.cpp',
+)
+
 peer_linker_files = files(
   'src/peer-linker.cpp',
   'src/server.cpp',
-) + ws_files + ws_server_files
+) + session_key_files + ws_files + ws_server_files
 
 channel_hub_files = files(
   'src/channel-hub.cpp',
   'src/server.cpp',
-) + ws_files + ws_server_files
+) + session_key_files + ws_files + ws_server_files
 
-executable('peer-linker', peer_linker_files, dependencies : ws_deps)
-executable('channel-hub', channel_hub_files, dependencies : ws_deps)
+executable('peer-linker', peer_linker_files, dependencies : ws_deps + crypto_utils_deps)
+executable('channel-hub', channel_hub_files, dependencies : ws_deps + crypto_utils_deps)
 executable('session-key-util', files(
   'src/session-key-util.cpp',
-  'src/session-key.cpp',
-  'src/crypto/hmac.cpp',
-  'src/crypto/base64.cpp',
-), dependencies : crypto_utils_deps)
+) + session_key_files, dependencies : crypto_utils_deps)
 
 if get_option('client')
   client_files = files(

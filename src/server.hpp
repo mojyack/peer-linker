@@ -3,13 +3,6 @@
 #include "session-key.hpp"
 #include "ws/server.hpp"
 
-struct Session {
-    bool activated = false;
-
-    virtual auto handle_payload(std::span<const std::byte> payload) -> bool = 0;
-    virtual ~Session() {}
-};
-
 struct Server {
     ws::server::Context       websocket_context;
     std::optional<SessionKey> session_key;
@@ -19,6 +12,16 @@ struct Server {
     auto send_to(lws* const wsi, const uint16_t type, const uint32_t id, Args... args) -> bool {
         return websocket_context.send(wsi, p2p::proto::build_packet(type, id, args...));
     }
+};
+
+struct Session {
+    bool activated = false;
+
+    virtual auto handle_payload(std::span<const std::byte> payload) -> bool = 0;
+
+    auto activate(Server& server, std::string_view cert) -> bool;
+
+    virtual ~Session() {}
 };
 
 auto run(int argc, const char* const* argv,

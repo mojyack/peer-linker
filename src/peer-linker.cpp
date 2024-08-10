@@ -14,7 +14,8 @@ struct Pad {
 
 struct Error {
     enum {
-        EmptyPadName = 0,
+        NotActivated = 0,
+        EmptyPadName,
         AlreadyRegistered,
         NotRegistered,
         PadFound,
@@ -30,6 +31,7 @@ struct Error {
 };
 
 const auto estr = std::array{
+    "session is not activated",              // NotActivated
     "empty pad name",                        // EmptyPadName
     "session already has pad",               // AlreadyRegistered
     "session has no pad",                    // NotRegistered
@@ -69,6 +71,17 @@ struct PeerLinkerSession : Session {
 
 auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, p2p::proto::extract_header(payload));
+
+    if(header.type == ::p2p::proto::Type::ActivateSession) {
+        const auto cert = p2p::proto::extract_last_string<proto::Register>(payload);
+        PRINT("received activate session");
+        assert_b(activate(*server, cert), "failed to verify user certificate");
+        PRINT("session activated");
+        goto finish;
+    } else {
+        assert_b(activated, estr[Error::NotActivated]);
+    }
+
     switch(header.type) {
     case proto::Type::Register: {
         const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
@@ -163,6 +176,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
     }
     }
 
+finish:
     assert_b(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
     return true;
 }

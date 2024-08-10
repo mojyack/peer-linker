@@ -9,6 +9,16 @@
 #include "util/file-io.hpp"
 #include "ws/misc.hpp"
 
+auto Session::activate(Server& server, const std::string_view cert) -> bool {
+    if(auto& key = server.session_key) {
+        unwrap_ob(parsed, key->split_user_certificate_to_hash_and_content(cert));
+        const auto [hash_str, content] = parsed;
+        assert_b(key->verify_user_certificate_hash(hash_str, content));
+    }
+    activated = true;
+    return true;
+}
+
 struct ServerArgs {
     const char* session_key_secret_file = nullptr;
     uint16_t    port                    = 0;
