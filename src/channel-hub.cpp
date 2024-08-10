@@ -12,7 +12,8 @@ struct Channel {
 
 struct Error {
     enum {
-        EmptyChannelName = 0,
+        NotActivated = 0,
+        EmptyChannelName,
         ChannelFound,
         ChannelNotFound,
         SenderMismatch,
@@ -24,6 +25,7 @@ struct Error {
 };
 
 const auto estr = std::array{
+    "session is not activated",                  // NotActivated
     "empty channel name",                        // EmptyChannelName
     "channel with that name already registered", // ChannelFound
     "no such channel registered",                // ChannelNotFound
@@ -51,6 +53,17 @@ struct ChannelHub : Server {
 
 auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload) -> bool {
     unwrap_pb(header, p2p::proto::extract_header(payload));
+
+    if(header.type == ::p2p::proto::Type::ActivateSession) {
+        const auto cert = p2p::proto::extract_last_string<proto::Register>(payload);
+        PRINT("received activate session");
+        assert_b(activate(*server, cert), "failed to verify user certificate");
+        PRINT("session activated");
+        goto finish;
+    } else {
+        assert_b(activated, estr[Error::NotActivated]);
+    }
+
     switch(header.type) {
     case ::p2p::proto::Type::Success:
     case ::p2p::proto::Type::Error:
@@ -128,6 +141,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
     }
     }
 
+finish:
     assert_b(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
     return true;
 }
