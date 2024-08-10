@@ -4,3 +4,6 @@
 [submodule "submodules/crypto-utils"]
 	path = submodules/crypto-utils
 	url = https://github.com/mojyack/crypto-utils.git
+[submodule "submodules/process-spawn-cpp"]
+	path = submodules/process-spawn-cpp
+	url = https://github.com/mojyack/process-spawn-cpp.git
