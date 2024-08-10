@@ -21,6 +21,8 @@ auto Session::activate(Server& server, const std::string_view cert) -> bool {
 
 struct ServerArgs {
     const char* session_key_secret_file = nullptr;
+    const char* ssl_cert_file           = nullptr;
+    const char* ssl_key_file            = nullptr;
     uint16_t    port                    = 0;
     bool        help                    = false;
     bool        verbose                 = false;
@@ -37,6 +39,8 @@ auto ServerArgs::parse(const int argc, const char* const* const argv, std::strin
     parser.kwarg(&args.help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
     parser.kwarg(&args.port, {"-p"}, {"PORT", "port number to use", args::State::DefaultValue});
     parser.kwarg(&args.session_key_secret_file, {"-k", "--key"}, {"FILE", "enable user verification with the secret file", args::State::Initialized});
+    parser.kwarg(&args.ssl_cert_file, {"-sc", "--ssl-cert"}, {"FILE", "ssl certificate file", args::State::Initialized});
+    parser.kwarg(&args.ssl_key_file, {"-sk", "--ssl-key"}, {"FILE", "ssk private key file", args::State::Initialized});
     parser.kwarg(&args.verbose, {"-v"}, {.arg_desc = "enable signaling server debug output", .state = args::State::Initialized});
     parser.kwarg(&args.websocket_verbose, {"-wv"}, {.arg_desc = "enable websocket debug output", .state = args::State::Initialized});
     parser.kwarg(&args.websocket_dump_packets, {"-wd"}, {.arg_desc = "dump every websocket packets", .state = args::State::Initialized});
@@ -84,8 +88,8 @@ auto run(const int argc, const char* const* const argv,
     ws::set_log_level(args.libws_debug_bitmap);
     assert_b(wsctx.init({
         .protocol    = protocol,
-        .cert        = nullptr,
-        .private_key = nullptr,
+        .cert        = args.ssl_cert_file,
+        .private_key = args.ssl_key_file,
         .port        = args.port,
     }));
     print("ready");
