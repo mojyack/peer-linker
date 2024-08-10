@@ -83,8 +83,10 @@ auto run(const int argc, const char* const* const argv,
         unwrap_ob(secret, read_file(args.session_key_secret_file), "failed to read session key secret file");
         server.session_key.emplace(secret);
     }
-    server.user_cert_verifier = std::filesystem::absolute(args.user_cert_verifier).string();
-    server.verbose            = args.verbose;
+    if(args.user_cert_verifier != nullptr) {
+        server.user_cert_verifier = std::filesystem::absolute(args.user_cert_verifier).string();
+    }
+    server.verbose = args.verbose;
 
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
