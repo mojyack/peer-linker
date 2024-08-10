@@ -18,12 +18,14 @@ class ChannelHubSender : public p2p::chub::ChannelHubSender {
 };
 
 auto run(const int argc, const char* const* const argv) -> bool {
-    auto cert_file = (const char*)(nullptr);
-    auto help      = false;
+    auto cert_file         = (const char*)(nullptr);
+    auto allow_self_signed = false;
+    auto help              = false;
 
     auto parser = args::Parser<uint16_t, uint8_t>();
     parser.kwarg(&help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
     parser.kwarg(&cert_file, {"-k"}, {"CERT_FILE", "use user certificate", args::State::Initialized});
+    parser.kwarg(&allow_self_signed, {"-a"}, {"", "allow self signed ssl certificate", args::State::Initialized});
     if(!parser.parse(argc, argv) || help) {
         print("usage: channel-hub-client-test ", parser.get_help());
         return true;
@@ -41,8 +43,8 @@ auto run(const int argc, const char* const* const argv) -> bool {
     sender.verbose = true;
     sender.set_ws_debug_flags(true, true);
     auto receiver = p2p::chub::ChannelHubReceiver();
-    assert_b(sender.start({channel_hub, user_cert}));
-    assert_b(receiver.start({channel_hub, user_cert}));
+    assert_b(sender.start({channel_hub, user_cert, allow_self_signed}));
+    assert_b(receiver.start({channel_hub, user_cert, allow_self_signed}));
 
     assert_b(sender.register_channel("room-1-audio"));
     assert_b(sender.register_channel("room-1-video"));

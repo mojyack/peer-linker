@@ -6,7 +6,8 @@
 namespace p2p::chub {
 struct ChannelHubSessionParams {
     wss::ServerLocation channel_hub;
-    std::string_view    user_certificate = {};
+    std::string_view    user_certificate              = {};
+    bool                channel_hub_allow_self_signed = false;
 };
 
 class ChannelHubSession : public wss::WebSocketSession {
