@@ -4,9 +4,14 @@
 #include "websocket-session.hpp"
 
 namespace p2p::chub {
+struct ChannelHubSessionParams {
+    wss::ServerLocation channel_hub;
+    std::string_view    user_certificate = {};
+};
+
 class ChannelHubSession : public wss::WebSocketSession {
   public:
-    auto start(wss::ServerLocation channel_hub, std::string_view user_cert = {}) -> bool;
+    auto start(const ChannelHubSessionParams& params) -> bool;
 
     virtual ~ChannelHubSession();
 };
