@@ -66,6 +66,7 @@ auto PeerLinkerSession::start(const PeerLinkerSessionParams& params) -> bool {
         events->linked.notify();
     });
 
+    assert_b(send_packet(::p2p::proto::Type::ActivateSession, params.user_certificate));
     assert_b(send_packet(proto::Type::Register, params.pad_name));
     on_pad_created();
 
