@@ -6,7 +6,7 @@
 namespace p2p::chub {
 class ChannelHubSession : public wss::WebSocketSession {
   public:
-    auto start(wss::ServerLocation channel_hub) -> bool;
+    auto start(wss::ServerLocation channel_hub, std::string_view user_cert = {}) -> bool;
 
     virtual ~ChannelHubSession();
 };
