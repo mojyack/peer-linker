@@ -14,7 +14,7 @@ struct PeerLinkerSessionParams {
     wss::ServerLocation peer_linker;
     std::string_view    pad_name;
     std::string_view    target_pad_name;
-    std::string_view    user_certificate;
+    std::string_view    user_certificate              = {};
     const char*         bind_address                  = nullptr;
     bool                peer_linker_allow_self_signed = false;
 };
