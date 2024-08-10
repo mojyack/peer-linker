@@ -19,7 +19,7 @@ struct Packet {
 } __attribute__((packed));
 
 struct ActivateSession : ::p2p::proto::Packet {
-    // std::byte key[];
+    // char user_certificate[];
 };
 
 } // namespace p2p::proto
