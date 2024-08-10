@@ -12,6 +12,7 @@ struct EventKind {
 
 struct PeerLinkerSessionParams {
     wss::ServerLocation peer_linker;
+    const char*         peer_linker_ssl_cert = nullptr;
     std::string_view    pad_name;
     std::string_view    target_pad_name;
     std::string_view    user_certificate;
