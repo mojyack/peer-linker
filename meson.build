@@ -7,6 +7,7 @@ if get_option('client')
 else
   subdir('src/ws')
 endif
+subdir('src/crypto')
 
 peer_linker_files = files(
   'src/peer-linker.cpp',
@@ -20,6 +21,12 @@ channel_hub_files = files(
 
 executable('peer-linker', peer_linker_files, dependencies : ws_deps)
 executable('channel-hub', channel_hub_files, dependencies : ws_deps)
+executable('session-key-util', files(
+  'src/session-key-util.cpp',
+  'src/session-key.cpp',
+  'src/crypto/hmac.cpp',
+  'src/crypto/base64.cpp',
+), dependencies : crypto_utils_deps)
 
 if get_option('client')
   client_files = files(
