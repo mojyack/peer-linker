@@ -8,6 +8,7 @@ else
   subdir('src/ws')
 endif
 subdir('src/crypto')
+subdir('src/spawn')
 
 session_key_files = files(
   'src/session-key.cpp',
@@ -17,8 +18,7 @@ session_key_files = files(
 
 server_files = files(
   'src/server.cpp',
-  'src/spawn/process.cpp',
-) + session_key_files + ws_files + ws_server_files
+) + session_key_files + ws_files + ws_server_files + process_spawn_files
 
 peer_linker_files = files(
   'src/peer-linker.cpp',

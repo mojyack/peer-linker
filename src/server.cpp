@@ -6,10 +6,15 @@
 #include "macros/unwrap.hpp"
 #include "protocol-helper.hpp"
 #include "server.hpp"
-#include "spawn/process.hpp"
 #include "util/argument-parser.hpp"
 #include "util/file-io.hpp"
 #include "ws/misc.hpp"
+
+#if defined(_WIN32)
+#include "spawn/process-win.hpp"
+#else
+#include "spawn/process.hpp"
+#endif
 
 auto Session::activate(Server& server, const std::string_view cert) -> bool {
     if(auto& key = server.session_key) {
