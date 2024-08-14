@@ -58,19 +58,11 @@ auto PeerLinkerSession::start(const PeerLinkerSessionParams& params) -> bool {
         .protocol     = "peer-linker",
         .bind_address = params.bind_address,
     }));
+    assert_b(start_plink(params));
+    return true;
+}
 
-    struct Events {
-        Event linked;
-    };
-    auto events = std::shared_ptr<Events>(new Events());
-
-    add_event_handler(EventKind::Linked, [this, events](const uint32_t result) {
-        if(!result) {
-            stop();
-        }
-        events->linked.notify();
-    });
-
+auto PeerLinkerSession::start_plink(const PeerLinkerSessionParams& params) -> bool {
     assert_b(send_packet(::p2p::proto::Type::ActivateSession, params.user_certificate));
     assert_b(send_packet(proto::Type::Register, params.pad_name));
     on_pad_created();
@@ -84,9 +76,18 @@ auto PeerLinkerSession::start(const PeerLinkerSessionParams& params) -> bool {
                              params.target_pad_name,
                              secret));
     }
-    events->linked.wait();
+    linked_event.wait();
 
     return is_connected();
+}
+
+PeerLinkerSession::PeerLinkerSession() {
+    add_event_handler(EventKind::Linked, [this](const uint32_t result) {
+        if(!result) {
+            stop();
+        }
+        linked_event.notify();
+    });
 }
 
 PeerLinkerSession::~PeerLinkerSession() {

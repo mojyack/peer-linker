@@ -103,19 +103,12 @@ auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload
 }
 
 auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool {
-    struct Events {
-        Event sdp_set;
-        Event gathering_done;
-        Event connected;
-    };
-    auto events = std::shared_ptr<Events>(new Events());
-
-    add_event_handler(EventKind::SDPSet, [events](uint32_t) { events->sdp_set.notify(); });
-    add_event_handler(EventKind::RemoteGatheringDone, [events](uint32_t) { events->gathering_done.notify(); });
-    add_event_handler(EventKind::Connected, [events](uint32_t) { events->connected.notify(); });
-
     assert_b(plink::PeerLinkerSession::start(plink_params));
+    assert_b(start_ice(params, plink_params));
+    return true;
+}
 
+auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool {
     const auto controlled = plink_params.target_pad_name.empty();
 
     auto config = juice_config_t{
@@ -138,7 +131,7 @@ auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSe
     }
     agent.reset(juice_create(&config));
     if(controlled) {
-        events->sdp_set.wait();
+        sdp_set_event.wait();
         juice_set_remote_description(agent.get(), remote_sdp.data());
     }
 
@@ -149,15 +142,21 @@ auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSe
     }
     assert_b(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
     if(!controlled) {
-        events->sdp_set.wait();
+        sdp_set_event.wait();
         juice_set_remote_description(agent.get(), remote_sdp.data());
     }
 
     juice_gather_candidates(agent.get());
     // seems not mandatory
-    // events->gathering_done.wait();
-    events->connected.wait();
+    // gathering_done_event.wait();
+    connected_event.wait();
     return is_connected();
+}
+
+IceSession::IceSession() {
+    add_event_handler(EventKind::SDPSet, [this](uint32_t) { sdp_set_event.notify(); });
+    add_event_handler(EventKind::RemoteGatheringDone, [this](uint32_t) { gathering_done_event.notify(); });
+    add_event_handler(EventKind::Connected, [this](uint32_t) { connected_event.notify(); });
 }
 
 auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {
