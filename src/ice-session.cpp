@@ -160,7 +160,6 @@ IceSession::IceSession() {
 }
 
 auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {
-    assert_b(juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0);
-    return true;
+    return juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0;
 }
 } // namespace p2p::ice
