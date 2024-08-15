@@ -49,7 +49,8 @@ auto run(const int argc, const char* const* const argv) -> bool {
     assert_b(sender.register_channel("room-1-audio"));
     assert_b(sender.register_channel("room-1-video"));
     assert_b(sender.register_channel("room-1-audiovideo"));
-    for(const auto& channel : receiver.get_channels()) {
+    unwrap_ob(channels, receiver.get_channels());
+    for(const auto& channel : channels) {
         print("channel: ", channel);
     }
     unwrap_ob(pad_name, receiver.request_pad("room-1-audio"));

@@ -76,18 +76,9 @@ auto PeerLinkerSession::start_plink(const PeerLinkerSessionParams& params) -> bo
                              params.target_pad_name,
                              secret));
     }
-    linked_event.wait();
-
-    return is_connected();
-}
-
-PeerLinkerSession::PeerLinkerSession() {
-    add_event_handler(EventKind::Linked, [this](const uint32_t result) {
-        if(!result) {
-            stop();
-        }
-        linked_event.notify();
-    });
+    unwrap_ob(link_result, wait_for_event(EventKind::Linked));
+    assert_b(link_result == 1);
+    return true;
 }
 
 PeerLinkerSession::~PeerLinkerSession() {

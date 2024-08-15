@@ -38,7 +38,7 @@ class ChannelHubReceiver : public ChannelHubSession {
     auto on_packet_received(std::span<const std::byte> payload) -> bool override;
 
   public:
-    auto get_channels() -> std::vector<std::string>;
+    auto get_channels() -> std::optional<std::vector<std::string>>;
     auto request_pad(std::string_view channel_name) -> std::optional<std::string>;
 };
 } // namespace p2p::chub

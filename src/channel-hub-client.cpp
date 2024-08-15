@@ -64,20 +64,18 @@ auto ChannelHubSender::unregister_channel(const std::string_view name) -> bool {
 }
 
 auto ChannelHubSender::notify_pad_created(const uint16_t request_id, const std::string_view pad_name) -> void {
-    events.add_handler({
-        .kind    = wss::EventKind::Result,
-        .id      = request_id,
-        .handler = [](const uint32_t result) { assert_n(result, "failed to send pad request response"); },
-    });
+    events.register_callback(wss::EventKind::Result, request_id,
+                             [](const uint32_t result) {
+                                 assert_n(result, "failed to send pad request response");
+                             });
     send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(1), pad_name);
 }
 
 auto ChannelHubSender::notify_pad_not_created(const uint16_t request_id) -> void {
-    events.add_handler({
-        .kind    = wss::EventKind::Result,
-        .id      = request_id,
-        .handler = [](const uint32_t result) { assert_n(result, "failed to send pad request response"); },
-    });
+    events.register_callback(wss::EventKind::Result, request_id,
+                             [](const uint32_t result) {
+                                 assert_n(result, "failed to send pad request response");
+                             });
     send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(0));
 }
 
@@ -96,8 +94,9 @@ auto ChannelHubReceiver::on_packet_received(const std::span<const std::byte> pay
         return true;
     }
     case proto::Type::PadRequestResponse: {
+        unwrap_pb(packet, ::p2p::proto::extract_payload<proto::PadRequestResponse>(payload));
         pad_name_buffer = ::p2p::proto::extract_last_string<proto::PadRequestResponse>(payload);
-        events.invoke(EventKind::PadCreated, no_id, no_value);
+        events.invoke(EventKind::PadCreated, no_id, packet.ok);
         return true;
     }
     default:
@@ -105,13 +104,10 @@ auto ChannelHubReceiver::on_packet_received(const std::span<const std::byte> pay
     }
 }
 
-auto ChannelHubReceiver::get_channels() -> std::vector<std::string> {
-    auto received = Event();
-
+auto ChannelHubReceiver::get_channels() -> std::optional<std::vector<std::string>> {
     const auto id = allocate_packet_id();
-    events.add_handler({EventKind::Channels, id, [&](uint32_t) { received.notify(); }});
     send_generic_packet(proto::Type::GetChannels, id);
-    received.wait();
+    assert_o(wait_for_event(EventKind::Channels, id));
 
     const auto channels_str = std::exchange(channels_buffer, {});
     auto       channels     = std::vector<std::string>();
@@ -129,20 +125,10 @@ auto ChannelHubReceiver::get_channels() -> std::vector<std::string> {
 }
 
 auto ChannelHubReceiver::request_pad(const std::string_view channel_name) -> std::optional<std::string> {
-    // setup event handler before sending request
-    struct Events {
-        Event received;
-    };
-    auto events = std::shared_ptr<Events>(new Events());
-
-    add_event_handler(EventKind::PadCreated, [events](uint32_t) { events->received.notify(); });
-
-    // check for succeed of request
-    assert_o(send_packet(proto::Type::PadRequest, channel_name));
-
-    // wait for response
-    events->received.wait();
-
+    const auto id = allocate_packet_id();
+    send_generic_packet(proto::Type::PadRequest, id, channel_name);
+    unwrap_oo(result, wait_for_event(EventKind::PadCreated));
+    assert_o(result == 1);
     return pad_name_buffer;
 }
 } // namespace p2p::chub

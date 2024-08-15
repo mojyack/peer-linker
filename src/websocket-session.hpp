@@ -5,10 +5,6 @@
 #include "protocol-helper.hpp"
 #include "ws/client.hpp"
 
-#define CUTIL_NS p2p
-#include "util/event.hpp"
-#undef CUTIL_NS
-
 namespace p2p::wss {
 struct EventKind {
     enum {
@@ -47,7 +43,7 @@ class WebSocketSession {
     virtual auto on_disconnected() -> void;
 
     auto is_connected() const -> bool;
-    auto add_event_handler(uint32_t kind, std::function<EventHandler> handler) -> void;
+    auto wait_for_event(uint32_t kind, uint32_t id = no_id) -> std::optional<uint32_t>;
     // all subclasses must call destroy in their destructor
     auto destroy() -> void;
 
@@ -63,36 +59,22 @@ class WebSocketSession {
     }
 
     template <class... Args>
-    auto send_packet(uint16_t type, Args... args) -> bool {
+    auto send_packet(const uint16_t type, Args... args) -> bool {
         if(disconnected) {
             return false;
         }
-
-        auto event   = Event();
-        auto result  = bool();
-        auto handler = std::function<EventHandler>([&event, &result](uint32_t value) {
-            result = bool(value);
-            event.notify();
-        });
-
-        send_packet_detached(type, handler, std::forward<Args>(args)...);
-
-        event.wait();
-        return result && !disconnected;
+        const auto id = allocate_packet_id();
+        websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
+        return events.wait_for(EventKind::Result, id) && !disconnected;
     }
 
     template <class... Args>
-    auto send_packet_detached(uint16_t type, std::function<EventHandler> handler, Args... args) -> void {
+    auto send_packet_detached(const uint16_t type, const EventCallback callback, Args... args) -> void {
         if(disconnected) {
             return;
         }
-
         const auto id = allocate_packet_id();
-        events.add_handler({
-            .kind    = EventKind::Result,
-            .id      = id,
-            .handler = handler,
-        });
+        events.register_callback(EventKind::Result, id, callback);
         websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
     }
 

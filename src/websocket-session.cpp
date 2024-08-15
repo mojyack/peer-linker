@@ -40,12 +40,9 @@ auto WebSocketSession::is_connected() const -> bool {
     return !disconnected;
 }
 
-auto WebSocketSession::add_event_handler(const uint32_t kind, std::function<EventHandler> handler) -> void {
-    events.add_handler({
-        .kind    = kind,
-        .id      = no_id,
-        .handler = handler,
-    });
+auto WebSocketSession::wait_for_event(const uint32_t kind, const uint32_t id) -> std::optional<uint32_t> {
+    const auto value = events.wait_for(kind, id);
+    return is_connected() ? std::optional(value) : std::nullopt;
 }
 
 auto WebSocketSession::destroy() -> void {

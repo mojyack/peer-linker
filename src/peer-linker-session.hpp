@@ -20,9 +20,6 @@ struct PeerLinkerSessionParams {
 };
 
 class PeerLinkerSession : public wss::WebSocketSession {
-  private:
-    Event linked_event;
-
   protected:
     virtual auto on_pad_created() -> void;
     virtual auto get_auth_secret() -> std::vector<std::byte>;
@@ -33,7 +30,6 @@ class PeerLinkerSession : public wss::WebSocketSession {
     auto start(const PeerLinkerSessionParams& params) -> bool;
     auto start_plink(const PeerLinkerSessionParams& params) -> bool;
 
-    PeerLinkerSession();
     virtual ~PeerLinkerSession();
 };
 } // namespace p2p::plink

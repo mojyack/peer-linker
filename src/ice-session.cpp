@@ -64,7 +64,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
             PRINT("received gathering done");
         }
         juice_set_remote_gathering_done(agent.get());
-        events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
+        // events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
 
         send_result(::p2p::proto::Type::Success, header.id);
         return true;
@@ -131,7 +131,7 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
     }
     agent.reset(juice_create(&config));
     if(controlled) {
-        sdp_set_event.wait();
+        assert_b(wait_for_event(EventKind::SDPSet));
         juice_set_remote_description(agent.get(), remote_sdp.data());
     }
 
@@ -142,21 +142,15 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
     }
     assert_b(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
     if(!controlled) {
-        sdp_set_event.wait();
+        assert_b(wait_for_event(EventKind::SDPSet));
         juice_set_remote_description(agent.get(), remote_sdp.data());
     }
 
     juice_gather_candidates(agent.get());
     // seems not mandatory
-    // gathering_done_event.wait();
-    connected_event.wait();
-    return is_connected();
-}
-
-IceSession::IceSession() {
-    add_event_handler(EventKind::SDPSet, [this](uint32_t) { sdp_set_event.notify(); });
-    add_event_handler(EventKind::RemoteGatheringDone, [this](uint32_t) { gathering_done_event.notify(); });
-    add_event_handler(EventKind::Connected, [this](uint32_t) { connected_event.notify(); });
+    // assert_b(wait_for_event(EventKind::RemoteGatheringDone));
+    assert_b(wait_for_event(EventKind::Connected));
+    return true;
 }
 
 auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {

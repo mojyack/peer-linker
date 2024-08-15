@@ -11,7 +11,6 @@ struct EventKind {
         Connected = plink::EventKind::Limit,
         SDPSet,
         RemoteGatheringDone,
-        Linked,
 
         Limit,
     };
@@ -26,9 +25,6 @@ class IceSession : public plink::PeerLinkerSession {
   private:
     AutoJuiceAgent agent;
     std::string    remote_sdp;
-    Event          sdp_set_event;
-    Event          gathering_done_event;
-    Event          connected_event;
 
   protected:
     virtual auto on_packet_received(std::span<const std::byte> payload) -> bool override;
@@ -46,7 +42,6 @@ class IceSession : public plink::PeerLinkerSession {
     auto start_ice(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool;
     auto send_packet_p2p(const std::span<const std::byte> payload) -> bool;
 
-    IceSession();
     virtual ~IceSession() {}
 };
 } // namespace p2p::ice
