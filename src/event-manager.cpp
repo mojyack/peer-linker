@@ -10,7 +10,7 @@ auto Events::eh_match(const uint32_t kind, const uint32_t id) -> auto {
     return [kind, id](const Handler& h) { return h.kind == kind && h.id == id; };
 }
 
-auto Events::register_callback(const uint32_t kind, const uint32_t id, const EventCallback callback) -> void {
+auto Events::register_callback(const uint32_t kind, const uint32_t id, const EventCallback callback) -> bool {
     if(debug) {
         PRINT("new event handler registered kind: ", kind, " id: ", id);
     }
@@ -18,6 +18,7 @@ auto Events::register_callback(const uint32_t kind, const uint32_t id, const Eve
     auto value = std::optional<uint32_t>();
     {
         auto guard = std::lock_guard(lock);
+        assert_b(!drained);
         if(const auto i = std::ranges::find_if(notified, eh_match(kind, id)); i != notified.end()) {
             value = i->value;
             notified.erase(i);
@@ -28,18 +29,19 @@ auto Events::register_callback(const uint32_t kind, const uint32_t id, const Eve
                 .id       = id,
                 .callback = callback,
             });
-            return;
+            return true;
         }
     }
     if(value) {
         callback(*value);
-        return;
     }
+    return true;
 }
 
-auto Events::wait_for(const uint32_t kind, const uint32_t id) -> uint32_t {
+auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<uint32_t> {
     {
         auto guard = std::lock_guard(lock);
+        assert_o(!drained);
         if(const auto i = std::ranges::find_if(notified, eh_match(kind, id)); i != notified.end()) {
             notified.erase(i);
             return i->value;
@@ -47,7 +49,7 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id) -> uint32_t {
     }
     auto event = Event();
     auto value = uint32_t();
-    register_callback(kind, id, [&event, &value](const uint32_t v) {value = v; event.notify(); });
+    assert_o(register_callback(kind, id, [&event, &value](const uint32_t v) {value = v; event.notify(); }));
     event.wait();
     return value;
 }
@@ -77,9 +79,16 @@ auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> v
     found->callback(value);
 }
 
-auto Events::drain() -> void {
+auto Events::drain() -> bool {
     if(debug) {
         PRINT("draining...");
+    }
+
+    {
+        auto guard = std::lock_guard(lock);
+        if(std::exchange(drained, true)) {
+            return false;
+        }
     }
 
 loop:
@@ -87,12 +96,17 @@ loop:
     {
         auto guard = std::lock_guard(lock);
         if(handlers.empty()) {
-            return;
+            return true;
         }
         found = std::move(handlers.back());
         handlers.pop_back();
     }
-    found->callback(0);
+    found->callback(drained_value);
     goto loop;
+}
+
+auto Events::is_drained() const -> bool {
+    auto guard = std::lock_guard(lock);
+    return drained;
 }
 } // namespace p2p

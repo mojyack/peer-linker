@@ -32,9 +32,9 @@ class WebSocketSession {
     std::thread         signaling_worker;
     uint32_t            packet_id = 0;
 
-    std::atomic_bool disconnected = false;
-
     auto handle_raw_packet(std::span<const std::byte> payload) -> void;
+    auto send_packet(std::vector<std::byte> payload) -> bool;
+    auto send_packet_detached(EventCallback callback, std::vector<std::byte> payload) -> bool;
 
   protected:
     Events events;
@@ -60,22 +60,12 @@ class WebSocketSession {
 
     template <class... Args>
     auto send_packet(const uint16_t type, Args... args) -> bool {
-        if(disconnected) {
-            return false;
-        }
-        const auto id = allocate_packet_id();
-        websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
-        return events.wait_for(EventKind::Result, id) && !disconnected;
+        return send_packet(proto::build_packet(type, 0, std::forward<Args>(args)...));
     }
 
     template <class... Args>
-    auto send_packet_detached(const uint16_t type, const EventCallback callback, Args... args) -> void {
-        if(disconnected) {
-            return;
-        }
-        const auto id = allocate_packet_id();
-        events.register_callback(EventKind::Result, id, callback);
-        websocket_context.send(proto::build_packet(type, id, std::forward<Args>(args)...));
+    auto send_packet_detached(const uint16_t type, const EventCallback callback, Args... args) -> bool {
+        return send_packet_detached(callback, proto::build_packet(type, 0, std::forward<Args>(args)...));
     }
 
     template <class... Args>

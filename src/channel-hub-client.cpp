@@ -53,6 +53,13 @@ auto ChannelHubSender::on_packet_received(const std::span<const std::byte> paylo
     }
 }
 
+auto ChannelHubSender::register_result_callback(const uint16_t request_id) -> bool {
+    return events.register_callback(wss::EventKind::Result, request_id,
+                                    [](const uint32_t result) {
+                                        assert_n(result, "failed to send pad request response");
+                                    });
+}
+
 auto ChannelHubSender::register_channel(const std::string_view name) -> bool {
     assert_b(send_packet(proto::Type::Register, name));
     return true;
@@ -63,20 +70,16 @@ auto ChannelHubSender::unregister_channel(const std::string_view name) -> bool {
     return true;
 }
 
-auto ChannelHubSender::notify_pad_created(const uint16_t request_id, const std::string_view pad_name) -> void {
-    events.register_callback(wss::EventKind::Result, request_id,
-                             [](const uint32_t result) {
-                                 assert_n(result, "failed to send pad request response");
-                             });
+auto ChannelHubSender::notify_pad_created(const uint16_t request_id, const std::string_view pad_name) -> bool {
+    assert_b(register_result_callback(request_id));
     send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(1), pad_name);
+    return true;
 }
 
-auto ChannelHubSender::notify_pad_not_created(const uint16_t request_id) -> void {
-    events.register_callback(wss::EventKind::Result, request_id,
-                             [](const uint32_t result) {
-                                 assert_n(result, "failed to send pad request response");
-                             });
+auto ChannelHubSender::notify_pad_not_created(const uint16_t request_id) -> bool {
+    assert_b(register_result_callback(request_id));
     send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(0));
+    return true;
 }
 
 // ChannelHubReceiver

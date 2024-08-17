@@ -32,17 +32,37 @@ auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> 
     }
 }
 
+auto WebSocketSession::send_packet(std::vector<std::byte> payload) -> bool {
+    const auto id = allocate_packet_id();
+
+    std::bit_cast<proto::Packet*>(payload.data())->id = id;
+    assert_b(websocket_context.send(payload));
+    unwrap_ob(value, wait_for_event(EventKind::Result, id));
+    assert_b(value == 1);
+    return true;
+}
+
+auto WebSocketSession::send_packet_detached(const EventCallback callback, const std::vector<std::byte> payload) -> bool {
+    const auto id = allocate_packet_id();
+
+    std::bit_cast<proto::Packet*>(payload.data())->id = id;
+    assert_b(events.register_callback(EventKind::Result, id, callback));
+    assert_b(websocket_context.send(payload));
+    return true;
+}
+
 auto WebSocketSession::on_disconnected() -> void {
     PRINT("session disconnected");
 }
 
 auto WebSocketSession::is_connected() const -> bool {
-    return !disconnected;
+    return !events.is_drained();
 }
 
 auto WebSocketSession::wait_for_event(const uint32_t kind, const uint32_t id) -> std::optional<uint32_t> {
-    const auto value = events.wait_for(kind, id);
-    return is_connected() ? std::optional(value) : std::nullopt;
+    unwrap_oo(result, events.wait_for(kind, id));
+    assert_o(result != drained_value);
+    return result;
 }
 
 auto WebSocketSession::destroy() -> void {
@@ -69,7 +89,7 @@ auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
         .ssl_level    = params.ssl_level,
     }));
     signaling_worker = std::thread([this]() -> void {
-        while(!disconnected && websocket_context.state == ws::client::State::Connected) {
+        while(is_connected() && websocket_context.state == ws::client::State::Connected) {
             websocket_context.process();
         }
         stop();
@@ -78,10 +98,9 @@ auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
 }
 
 auto WebSocketSession::stop() -> void {
-    if(disconnected.exchange(true)) {
+    if(!events.drain()) {
         return;
     }
-    events.drain();
     if(websocket_context.state == ws::client::State::Connected) {
         websocket_context.shutdown();
     }

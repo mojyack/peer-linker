@@ -20,14 +20,15 @@ class ChannelHubSession : public wss::WebSocketSession {
 class ChannelHubSender : public ChannelHubSession {
   private:
     auto on_packet_received(std::span<const std::byte> payload) -> bool override;
+    auto register_result_callback(uint16_t request_id) -> bool;
 
   public:
     virtual auto on_pad_request(uint16_t request_id, const std::string_view channel_name) -> bool = 0;
 
     auto register_channel(std::string_view name) -> bool;
     auto unregister_channel(std::string_view name) -> bool;
-    auto notify_pad_created(uint16_t request_id, std::string_view pad_name) -> void;
-    auto notify_pad_not_created(uint16_t request_id) -> void;
+    auto notify_pad_created(uint16_t request_id, std::string_view pad_name) -> bool;
+    auto notify_pad_not_created(uint16_t request_id) -> bool;
 };
 
 class ChannelHubReceiver : public ChannelHubSession {
