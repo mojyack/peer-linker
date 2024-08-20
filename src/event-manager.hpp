@@ -3,6 +3,7 @@
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <optional>
 
 namespace p2p {
 using EventCallback = std::function<void(uint32_t value)>;

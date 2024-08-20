@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <optional>
+#include <utility>
 
 #include "event-manager.hpp"
 #include "macros/assert.hpp"
