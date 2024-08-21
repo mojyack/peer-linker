@@ -18,9 +18,9 @@
 
 auto Session::activate(Server& server, const std::string_view cert) -> bool {
     if(auto& key = server.session_key) {
-        unwrap_ob(parsed, key->split_user_certificate_to_hash_and_content(cert));
+        unwrap(parsed, key->split_user_certificate_to_hash_and_content(cert));
         const auto [hash_str, content] = parsed;
-        assert_b(key->verify_user_certificate_hash(hash_str, content));
+        ensure(key->verify_user_certificate_hash(hash_str, content));
 
         if(!server.user_cert_verifier.empty()) {
             auto cont = std::string(content);
@@ -30,13 +30,13 @@ auto Session::activate(Server& server, const std::string_view cert) -> bool {
             auto on_output    = [](const std::span<const char> output) { std::cout << "verifier: " << std::string_view(output.data(), output.size()); };
             process.on_stdout = on_output;
             process.on_stderr = on_output;
-            assert_b(process.start(args), "failed to launch verifier");
+            ensure(process.start(args), "failed to launch verifier");
             while(process.get_status() == process::Status::Running) {
                 process.collect_outputs();
             }
-            unwrap_ob(result, process.join());
-            assert_b(result.reason == process::Result::ExitReason::Exit, "verifier exitted abnormally");
-            assert_b(result.code == 0, "verifier returned non-zero code: ", result.code);
+            unwrap(result, process.join());
+            ensure(result.reason == process::Result::ExitReason::Exit, "verifier exitted abnormally");
+            ensure(result.code == 0, "verifier returned non-zero code: ", result.code);
         }
     }
     activated = true;
@@ -83,9 +83,9 @@ auto run(const int argc, const char* const* const argv,
          Server&                                             server,
          std::unique_ptr<ws::server::SessionDataInitializer> session_initer,
          const char* const                                   protocol) -> bool {
-    unwrap_ob(args, ServerArgs::parse(argc, argv, protocol, default_port));
+    unwrap(args, ServerArgs::parse(argc, argv, protocol, default_port));
     if(args.session_key_secret_file != nullptr) {
-        unwrap_ob(secret, read_file(args.session_key_secret_file), "failed to read session key secret file");
+        unwrap(secret, read_file(args.session_key_secret_file), "failed to read session key secret file");
         server.session_key.emplace(secret);
     }
     if(args.user_cert_verifier != nullptr) {
@@ -97,17 +97,17 @@ auto run(const int argc, const char* const* const argv,
     wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
         if(server.verbose) {
-            PRINT("session ", &session, ": ", "received ", payload.size(), " bytes");
+            line_print("session ", &session, ": ", "received ", payload.size(), " bytes");
         }
         if(!session.handle_payload(payload)) {
-            WARN("payload handling failed");
+            line_warn("payload handling failed");
 
             const auto& header_o = p2p::proto::extract_header(payload);
             if(!header_o) {
-                WARN("packet too short");
-                assert_n(server.send_to(wsi, p2p::proto::Type::Error, 0));
+                line_warn("packet too short");
+                ensure_v(server.send_to(wsi, p2p::proto::Type::Error, 0));
             } else {
-                assert_n(server.send_to(wsi, p2p::proto::Type::Error, header_o->id));
+                ensure_v(server.send_to(wsi, p2p::proto::Type::Error, header_o->id));
             }
         }
     };
@@ -115,7 +115,7 @@ auto run(const int argc, const char* const* const argv,
     wsctx.verbose             = args.websocket_verbose;
     wsctx.dump_packets        = args.websocket_dump_packets;
     ws::set_log_level(args.libws_debug_bitmap);
-    assert_b(wsctx.init({
+    ensure(wsctx.init({
         .protocol    = protocol,
         .cert        = args.ssl_cert_file,
         .private_key = args.ssl_key_file,

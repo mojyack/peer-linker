@@ -7,7 +7,7 @@ namespace {
 auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const user_ptr) -> void {
     auto& session = *std::bit_cast<IceSession*>(user_ptr);
     if(session.verbose) {
-        PRINT("state changed: ", juice_state_to_string(state));
+        line_print("state changed: ", juice_state_to_string(state));
     }
     switch(state) {
     case JUICE_STATE_COMPLETED:
@@ -35,13 +35,13 @@ auto on_recv(juice_agent_t* const /*agent*/, const char* const data, const size_
 } // namespace
 
 auto IceSession::on_packet_received(const std::span<const std::byte> payload) -> bool {
-    unwrap_pb(header, p2p::proto::extract_header(payload));
+    unwrap(header, p2p::proto::extract_header(payload));
 
     switch(header.type) {
     case proto::Type::SetCandidates: {
         const auto sdp = p2p::proto::extract_last_string<proto::SetCandidates>(payload);
         if(verbose) {
-            PRINT("received remote candidates: ", sdp);
+            line_print("received remote candidates: ", sdp);
         }
         remote_sdp = sdp;
         events.invoke(EventKind::SDPSet, no_id, no_value);
@@ -52,7 +52,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
     case proto::Type::AddCandidates: {
         const auto sdp = p2p::proto::extract_last_string<proto::AddCandidates>(payload);
         if(verbose) {
-            PRINT("received additional candidates: ", sdp);
+            line_print("received additional candidates: ", sdp);
         }
         juice_add_remote_candidate(agent.get(), sdp.data());
 
@@ -61,7 +61,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
     }
     case proto::Type::GatheringDone: {
         if(verbose) {
-            PRINT("received gathering done");
+            line_print("received gathering done");
         }
         juice_set_remote_gathering_done(agent.get());
         // events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
@@ -84,27 +84,27 @@ auto IceSession::on_p2p_connected_state(const bool flag) -> void {
 
 auto IceSession::on_p2p_new_candidate(const std::string_view sdp) -> void {
     if(verbose) {
-        PRINT("new candidate: ", sdp);
+        line_print("new candidate: ", sdp);
     }
     send_packet_detached(
-        proto::Type::AddCandidates, [](uint32_t result) { assert_n(result, "failed to send new candidate"); }, sdp);
+        proto::Type::AddCandidates, [](uint32_t result) { ensure_v(result, "failed to send new candidate"); }, sdp);
 }
 
 auto IceSession::on_p2p_gathering_done() -> void {
     if(verbose) {
-        PRINT("gathering done");
+        line_print("gathering done");
     }
     send_packet_detached(
-        proto::Type::GatheringDone, [](uint32_t result) { assert_n(result, "failed to send gathering done signal"); });
+        proto::Type::GatheringDone, [](uint32_t result) { ensure_v(result, "failed to send gathering done signal"); });
 }
 
 auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload) -> void {
-    PRINT("p2p data received: ", payload.size(), " bytes");
+    line_print("p2p data received: ", payload.size(), " bytes");
 }
 
 auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool {
-    assert_b(plink::PeerLinkerSession::start(plink_params));
-    assert_b(start_ice(params, plink_params));
+    ensure(plink::PeerLinkerSession::start(plink_params));
+    ensure(start_ice(params, plink_params));
     return true;
 }
 
@@ -131,25 +131,25 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
     }
     agent.reset(juice_create(&config));
     if(controlled) {
-        assert_b(wait_for_event(EventKind::SDPSet));
+        ensure(wait_for_event(EventKind::SDPSet));
         juice_set_remote_description(agent.get(), remote_sdp.data());
     }
 
     auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
-    assert_b(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
+    ensure(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
     if(verbose) {
-        PRINT(plink_params.pad_name, "local sdp: ", sdp.data());
+        line_print(plink_params.pad_name, "local sdp: ", sdp.data());
     }
-    assert_b(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
+    ensure(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
     if(!controlled) {
-        assert_b(wait_for_event(EventKind::SDPSet));
+        ensure(wait_for_event(EventKind::SDPSet));
         juice_set_remote_description(agent.get(), remote_sdp.data());
     }
 
     juice_gather_candidates(agent.get());
     // seems not mandatory
-    // assert_b(wait_for_event(EventKind::RemoteGatheringDone));
-    assert_b(wait_for_event(EventKind::Connected));
+    // ensure(wait_for_event(EventKind::RemoteGatheringDone));
+    ensure(wait_for_event(EventKind::Connected));
     return true;
 }
 

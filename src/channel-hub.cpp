@@ -52,29 +52,29 @@ struct ChannelHub : Server {
 };
 
 auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload) -> bool {
-    unwrap_pb(header, p2p::proto::extract_header(payload));
+    unwrap(header, p2p::proto::extract_header(payload));
 
     if(header.type == ::p2p::proto::Type::ActivateSession) {
         const auto cert = p2p::proto::extract_last_string<proto::Register>(payload);
         print("received activate session");
-        assert_b(activate(*server, cert), "failed to verify user certificate");
+        ensure(activate(*server, cert), "failed to verify user certificate");
         print("session activated");
         goto finish;
     } else {
-        assert_b(activated, estr[Error::NotActivated]);
+        ensure(activated, estr[Error::NotActivated]);
     }
 
     switch(header.type) {
     case ::p2p::proto::Type::Success:
     case ::p2p::proto::Type::Error:
-        WARN("unexpected packet");
+        line_warn("unexpected packet");
         return true;
     case proto::Type::Register: {
         const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
         print("received channel register request name:", name);
 
-        assert_b(!name.empty(), estr[Error::EmptyChannelName]);
-        assert_b(server->channels.find(name) == server->channels.end(), estr[Error::ChannelFound]);
+        ensure(!name.empty(), estr[Error::EmptyChannelName]);
+        ensure(server->channels.find(name) == server->channels.end(), estr[Error::ChannelFound]);
 
         print("channel ", name, " registerd");
         server->channels.insert(std::pair{name, Channel{std::string(name), wsi}});
@@ -84,9 +84,9 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         print("received channel unregister request name: ", name);
 
         const auto it = server->channels.find(name);
-        assert_b(it != server->channels.end(), estr[Error::ChannelNotFound]);
+        ensure(it != server->channels.end(), estr[Error::ChannelNotFound]);
         auto& channel = it->second;
-        assert_b(channel.wsi == wsi, estr[Error::SenderMismatch]);
+        ensure(channel.wsi == wsi, estr[Error::SenderMismatch]);
 
         print("unregistering channel ", channel.name);
         server->channels.erase(it);
@@ -101,7 +101,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
             std::memcpy(payload.data() + prev_size, name.data(), name.size() + 1);
         }
 
-        assert_b(server->send_to(wsi, proto::Type::GetChannelsResponse, header.id, payload));
+        ensure(server->send_to(wsi, proto::Type::GetChannelsResponse, header.id, payload));
         return true;
     } break;
     case proto::Type::PadRequest: {
@@ -110,39 +110,38 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
 
         // check if another request is pending
         for(auto i = server->pending_sessions.begin(); i != server->pending_sessions.end(); i = std::next(i)) {
-            assert_b(i->second != this, estr[Error::AnotherRequestPending]);
+            ensure(i->second != this, estr[Error::AnotherRequestPending]);
         }
 
         const auto it = server->channels.find(name);
-        assert_b(it != server->channels.end(), estr[Error::ChannelNotFound]);
+        ensure(it != server->channels.end(), estr[Error::ChannelNotFound]);
         auto& channel = it->second;
 
         const auto id = server->packet_id += 1;
-        assert_b(server->send_to(channel.wsi, proto::Type::PadRequest, id, name));
+        ensure(server->send_to(channel.wsi, proto::Type::PadRequest, id, name));
         server->pending_sessions.insert({id, this});
     } break;
     case proto::Type::PadRequestResponse: {
         print("received pad request response");
 
-        unwrap_pb(packet, p2p::proto::extract_payload<proto::PadRequestResponse>(payload));
+        unwrap(packet, p2p::proto::extract_payload<proto::PadRequestResponse>(payload));
         const auto pad_name = p2p::proto::extract_last_string<proto::PadRequestResponse>(payload);
 
         const auto requester_it = server->pending_sessions.find(header.id);
-        assert_b(requester_it != server->pending_sessions.end(), estr[Error::RequesterNotFound]);
+        ensure(requester_it != server->pending_sessions.end(), estr[Error::RequesterNotFound]);
         const auto requester = requester_it->second;
         server->pending_sessions.erase(header.id);
 
         print("sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
-        assert_b(server->send_to(requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
+        ensure(server->send_to(requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
     } break;
     default: {
-        WARN("unknown command ", int(header.type));
-        return false;
+        bail("unknown command ", int(header.type));
     }
     }
 
 finish:
-    assert_b(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
+    ensure(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
     return true;
 }
 
@@ -180,7 +179,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 auto run(const int argc, const char* argv[]) -> bool {
     auto server = ChannelHub();
     auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
-    assert_b(run(argc, argv, 8081, server, std::move(initor), "channel-hub"));
+    ensure(run(argc, argv, 8081, server, std::move(initor), "channel-hub"));
     return true;
 }
 } // namespace

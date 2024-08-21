@@ -33,7 +33,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
 
     auto user_cert = std::string();
     if(cert_file != nullptr) {
-        unwrap_ob(cert, read_file(cert_file));
+        unwrap(cert, read_file(cert_file));
         user_cert = from_span(cert);
     }
 
@@ -43,17 +43,17 @@ auto run(const int argc, const char* const* const argv) -> bool {
     sender.verbose = true;
     sender.set_ws_debug_flags(true, true);
     auto receiver = p2p::chub::ChannelHubReceiver();
-    assert_b(sender.start({channel_hub, user_cert, allow_self_signed}));
-    assert_b(receiver.start({channel_hub, user_cert, allow_self_signed}));
+    ensure(sender.start({channel_hub, user_cert, allow_self_signed}));
+    ensure(receiver.start({channel_hub, user_cert, allow_self_signed}));
 
-    assert_b(sender.register_channel("room-1-audio"));
-    assert_b(sender.register_channel("room-1-video"));
-    assert_b(sender.register_channel("room-1-audiovideo"));
-    unwrap_ob(channels, receiver.get_channels());
+    ensure(sender.register_channel("room-1-audio"));
+    ensure(sender.register_channel("room-1-video"));
+    ensure(sender.register_channel("room-1-audiovideo"));
+    unwrap(channels, receiver.get_channels());
     for(const auto& channel : channels) {
         print("channel: ", channel);
     }
-    unwrap_ob(pad_name, receiver.request_pad("room-1-audio"));
+    unwrap(pad_name, receiver.request_pad("room-1-audio"));
     print("acquired pad: ", pad_name);
     return true;
 }

@@ -6,19 +6,19 @@
 
 namespace {
 auto generate_cert(const char* const secret_file, const char* const content_file) -> bool {
-    unwrap_ob(secret, read_file(secret_file));
-    unwrap_ob(content, read_file(content_file));
+    unwrap(secret, read_file(secret_file));
+    unwrap(content, read_file(content_file));
     auto key = SessionKey(secret);
-    unwrap_ob(cert, key.generate_user_certificate(from_span(content)));
+    unwrap(cert, key.generate_user_certificate(from_span(content)));
     printf("%s", cert.data());
     return true;
 }
 
 auto verify_cert(const char* const secret_file, const char* const content_file) -> bool {
-    unwrap_ob(secret, read_file(secret_file));
-    unwrap_ob(cert, read_file(content_file));
+    unwrap(secret, read_file(secret_file));
+    unwrap(cert, read_file(content_file));
     auto key = SessionKey(secret);
-    unwrap_ob(parsed, key.split_user_certificate_to_hash_and_content(from_span(cert)));
+    unwrap(parsed, key.split_user_certificate_to_hash_and_content(from_span(cert)));
     const auto [hash_str, content] = parsed;
     return key.verify_user_certificate_hash(hash_str, content);
 }

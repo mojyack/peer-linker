@@ -31,16 +31,16 @@ auto main(const bool controlling) -> bool {
     session.set_ws_debug_flags(true, true);
     const auto peer_linker = p2p::wss::ServerLocation{server_domain, server_port};
     const auto stun_server = p2p::wss::ServerLocation{"stun.l.google.com", 19302};
-    assert_b(session.start({
-                               .stun_server = stun_server,
-                           },
-                           {
-                               .peer_linker                   = peer_linker,
-                               .pad_name                      = controlling ? "agent a" : "agent b",
-                               .target_pad_name               = controlling ? "agent b" : "",
-                               .user_certificate              = user_cert,
-                               .peer_linker_allow_self_signed = allow_self_signed,
-                           }));
+    ensure(session.start({
+                             .stun_server = stun_server,
+                         },
+                         {
+                             .peer_linker                   = peer_linker,
+                             .pad_name                      = controlling ? "agent a" : "agent b",
+                             .target_pad_name               = controlling ? "agent b" : "",
+                             .user_certificate              = user_cert,
+                             .peer_linker_allow_self_signed = allow_self_signed,
+                         }));
     return true;
 }
 
@@ -60,7 +60,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
     }
 
     if(cert_file != nullptr) {
-        unwrap_ob(cert, read_file(cert_file));
+        unwrap(cert, read_file(cert_file));
         user_cert = from_span(cert);
     }
 
@@ -71,11 +71,11 @@ auto run(const int argc, const char* const* const argv) -> bool {
         t2.join();
         t1.join();
     } else if(r == "server") {
-        assert_b(main(false));
+        ensure(main(false));
     } else if(r == "client") {
-        assert_b(main(true));
+        ensure(main(true));
     } else {
-        assert_b(false, "invalid role");
+        bail("invalid role");
     }
 
     return true;

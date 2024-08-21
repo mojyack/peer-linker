@@ -3,7 +3,7 @@
 
 namespace p2p::wss {
 auto WebSocketSession::on_packet_received(const std::span<const std::byte> payload) -> bool {
-    unwrap_pb(header, ::p2p::proto::extract_header(payload));
+    unwrap(header, ::p2p::proto::extract_header(payload));
 
     switch(header.type) {
     case ::p2p::proto::Type::Success:
@@ -13,18 +13,17 @@ auto WebSocketSession::on_packet_received(const std::span<const std::byte> paylo
         events.invoke(wss::EventKind::Result, header.id, 0);
         return true;
     default:
-        WARN("unhandled payload type ", int(header.type));
-        return false;
+        bail("unhandled payload type ", int(header.type));
     }
 }
 
 auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> void {
     if(!on_packet_received(payload)) {
-        WARN("payload handling failed");
+        line_warn("payload handling failed");
 
         const auto& header_o = p2p::proto::extract_header(payload);
         if(!header_o) {
-            WARN("packet too short");
+            line_warn("packet too short");
             send_result(::p2p::proto::Type::Error, 0);
         } else {
             send_result(::p2p::proto::Type::Error, header_o->id);
@@ -36,9 +35,9 @@ auto WebSocketSession::send_packet(std::vector<std::byte> payload) -> bool {
     const auto id = allocate_packet_id();
 
     std::bit_cast<proto::Packet*>(payload.data())->id = id;
-    assert_b(websocket_context.send(payload));
-    unwrap_ob(value, wait_for_event(EventKind::Result, id));
-    assert_b(value == 1);
+    ensure(websocket_context.send(payload));
+    unwrap(value, wait_for_event(EventKind::Result, id));
+    ensure(value == 1);
     return true;
 }
 
@@ -46,13 +45,13 @@ auto WebSocketSession::send_packet_detached(const EventCallback callback, const 
     const auto id = allocate_packet_id();
 
     std::bit_cast<proto::Packet*>(payload.data())->id = id;
-    assert_b(events.register_callback(EventKind::Result, id, callback));
-    assert_b(websocket_context.send(payload));
+    ensure(events.register_callback(EventKind::Result, id, callback));
+    ensure(websocket_context.send(payload));
     return true;
 }
 
 auto WebSocketSession::on_disconnected() -> void {
-    PRINT("session disconnected");
+    line_print("session disconnected");
 }
 
 auto WebSocketSession::is_connected() const -> bool {
@@ -60,8 +59,8 @@ auto WebSocketSession::is_connected() const -> bool {
 }
 
 auto WebSocketSession::wait_for_event(const uint32_t kind, const uint32_t id) -> std::optional<uint32_t> {
-    unwrap_oo(result, events.wait_for(kind, id));
-    assert_o(result != drained_value);
+    unwrap(result, events.wait_for(kind, id));
+    ensure(result != drained_value);
     return result;
 }
 
@@ -75,11 +74,11 @@ auto WebSocketSession::destroy() -> void {
 auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
         if(verbose) {
-            PRINT("received ", payload.size(), " bytes");
+            line_print("received ", payload.size(), " bytes");
         }
         handle_raw_packet(payload);
     };
-    assert_b(websocket_context.init({
+    ensure(websocket_context.init({
         .address      = params.server.address.data(),
         .path         = "/",
         .protocol     = params.protocol,

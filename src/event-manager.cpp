@@ -12,13 +12,13 @@ auto Events::eh_match(const uint32_t kind, const uint32_t id) -> auto {
 
 auto Events::register_callback(const uint32_t kind, const uint32_t id, const EventCallback callback) -> bool {
     if(debug) {
-        PRINT("new event handler registered kind: ", kind, " id: ", id);
+        line_print("new event handler registered kind: ", kind, " id: ", id);
     }
 
     auto value = std::optional<uint32_t>();
     {
         auto guard = std::lock_guard(lock);
-        assert_b(!drained);
+        ensure(!drained);
         if(const auto i = std::ranges::find_if(notified, eh_match(kind, id)); i != notified.end()) {
             value = i->value;
             notified.erase(i);
@@ -41,7 +41,7 @@ auto Events::register_callback(const uint32_t kind, const uint32_t id, const Eve
 auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<uint32_t> {
     {
         auto guard = std::lock_guard(lock);
-        assert_o(!drained);
+        ensure(!drained);
         if(const auto i = std::ranges::find_if(notified, eh_match(kind, id)); i != notified.end()) {
             notified.erase(i);
             return i->value;
@@ -49,7 +49,7 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<u
     }
     auto event = Event();
     auto value = uint32_t();
-    assert_o(register_callback(kind, id, [&event, &value](const uint32_t v) {value = v; event.notify(); }));
+    ensure(register_callback(kind, id, [&event, &value](const uint32_t v) {value = v; event.notify(); }));
     event.wait();
     return value;
 }
@@ -57,9 +57,9 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<u
 auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
     if(debug) {
         if(id != no_id) {
-            PRINT("new event kind: ", kind, " id: ", id, " value: ", value);
+            line_print("new event kind: ", kind, " id: ", id, " value: ", value);
         } else {
-            PRINT("new event kind: ", kind, " value: ", value);
+            line_print("new event kind: ", kind, " value: ", value);
         }
     }
 
@@ -71,7 +71,7 @@ auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> v
             handlers.erase(i);
         }
         if(!found) {
-            assert_n(notified.size() < 32, "event queue is full, dropping notified event kind=", kind, " id=", id, " value=", value);
+            ensure(notified.size() < 32, "event queue is full, dropping notified event kind=", kind, " id=", id, " value=", value);
             notified.emplace_back(Handler{.kind = kind, .id = id, .value = value});
             return;
         }
@@ -81,7 +81,7 @@ auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> v
 
 auto Events::drain() -> bool {
     if(debug) {
-        PRINT("draining...");
+        line_print("draining...");
     }
 
     {
