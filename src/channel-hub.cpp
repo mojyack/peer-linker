@@ -5,9 +5,12 @@
 
 namespace p2p::chub {
 namespace {
+struct ChannelHub;
+struct ChannelHubSession;
+
 struct Channel {
-    std::string name;
-    lws*        wsi;
+    std::string        name;
+    ChannelHubSession* session;
 };
 
 struct Error {
@@ -36,8 +39,6 @@ const auto estr = std::array{
 
 static_assert(Error::Limit == estr.size());
 
-struct ChannelHub;
-
 struct ChannelHubSession : Session {
     ChannelHub* server;
     lws*        wsi;
@@ -45,10 +46,15 @@ struct ChannelHubSession : Session {
     auto handle_payload(std::span<const std::byte> payload) -> bool override;
 };
 
+struct PendingRequest {
+    ChannelHubSession* requester;
+    ChannelHubSession* requestee;
+};
+
 struct ChannelHub : Server {
-    StringMap<Channel>                               channels;
-    std::unordered_map<uint32_t, ChannelHubSession*> pending_sessions;
-    uint32_t                                         packet_id;
+    StringMap<Channel>                           channels;
+    std::unordered_map<uint32_t, PendingRequest> pending_requests;
+    uint32_t                                     packet_id;
 };
 
 auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload) -> bool {
@@ -77,7 +83,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         ensure(server->channels.find(name) == server->channels.end(), estr[Error::ChannelFound]);
 
         print("channel ", name, " registerd");
-        server->channels.insert(std::pair{name, Channel{std::string(name), wsi}});
+        server->channels.insert(std::pair{name, Channel{std::string(name), this}});
     } break;
     case proto::Type::Unregister: {
         const auto name = p2p::proto::extract_last_string<proto::Unregister>(payload);
@@ -86,7 +92,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         const auto it = server->channels.find(name);
         ensure(it != server->channels.end(), estr[Error::ChannelNotFound]);
         auto& channel = it->second;
-        ensure(channel.wsi == wsi, estr[Error::SenderMismatch]);
+        ensure(channel.session == this, estr[Error::SenderMismatch]);
 
         print("unregistering channel ", channel.name);
         server->channels.erase(it);
@@ -109,8 +115,8 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         print("received pad request for channel: ", name);
 
         // check if another request is pending
-        for(auto i = server->pending_sessions.begin(); i != server->pending_sessions.end(); i = std::next(i)) {
-            ensure(i->second != this, estr[Error::AnotherRequestPending]);
+        for(auto i = server->pending_requests.begin(); i != server->pending_requests.end(); i = std::next(i)) {
+            ensure(i->second.requester != this, estr[Error::AnotherRequestPending]);
         }
 
         const auto it = server->channels.find(name);
@@ -118,8 +124,8 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         auto& channel = it->second;
 
         const auto id = server->packet_id += 1;
-        ensure(server->send_to(channel.wsi, proto::Type::PadRequest, id, name));
-        server->pending_sessions.insert({id, this});
+        ensure(server->send_to(channel.session->wsi, proto::Type::PadRequest, id, name));
+        server->pending_requests.insert({id, PendingRequest{.requester = this, .requestee = channel.session}});
     } break;
     case proto::Type::PadRequestResponse: {
         print("received pad request response");
@@ -127,13 +133,13 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         unwrap(packet, p2p::proto::extract_payload<proto::PadRequestResponse>(payload));
         const auto pad_name = p2p::proto::extract_last_string<proto::PadRequestResponse>(payload);
 
-        const auto requester_it = server->pending_sessions.find(header.id);
-        ensure(requester_it != server->pending_sessions.end(), estr[Error::RequesterNotFound]);
-        const auto requester = requester_it->second;
-        server->pending_sessions.erase(header.id);
+        const auto request_it = server->pending_requests.find(header.id);
+        ensure(request_it != server->pending_requests.end(), estr[Error::RequesterNotFound]);
+        const auto request = request_it->second;
+        server->pending_requests.erase(request_it);
 
         print("sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
-        ensure(server->send_to(requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
+        ensure(server->send_to(request.requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
     } break;
     default: {
         bail("unknown command ", int(header.type));
@@ -164,10 +170,25 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session = *std::bit_cast<ChannelHubSession*>(ptr);
 
         // remove corresponding channels
-        std::erase_if(server->channels, [&session](const auto& p) { return p.second.wsi == session.wsi; });
+        std::erase_if(server->channels, [&session](const auto& p) { return p.second.session == &session; });
 
         // remove from pending list
-        std::erase_if(server->pending_sessions, [&session](const auto& p) { return p.second->wsi == session.wsi; });
+        auto& requests = server->pending_requests;
+        for(auto i = requests.begin(); i != requests.end(); i = std::next(i)) {
+            const auto& request = i->second;
+            if(request.requester == &session) {
+                // pad requester has gone.
+                // delete request
+                requests.erase(i);
+                break;
+            } else if(request.requestee == &session) {
+                // pad requestee has gone.
+                // delete request and send fail to requester
+                server->send_to(request.requester->wsi, proto::Type::PadRequestResponse, 0, uint16_t(0));
+                requests.erase(i);
+                break;
+            }
+        }
 
         session.~ChannelHubSession();
     }
