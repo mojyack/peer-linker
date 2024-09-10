@@ -30,7 +30,7 @@ auto Session::activate(Server& server, const std::string_view cert) -> bool {
             auto on_output    = [](const std::span<const char> output) { std::cout << "verifier: " << std::string_view(output.data(), output.size()); };
             process.on_stdout = on_output;
             process.on_stderr = on_output;
-            ensure(process.start(args), "failed to launch verifier");
+            ensure(process.start({.argv = args, .die_on_parent_exit = true}), "failed to launch verifier");
             while(process.get_status() == process::Status::Running) {
                 process.collect_outputs();
             }
