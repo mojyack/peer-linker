@@ -16,6 +16,8 @@ struct PeerLinkerSessionParams {
     std::string_view    target_pad_name;
     std::string_view    user_certificate              = {};
     const char*         bind_address                  = nullptr;
+    uint16_t            connection_check_interval     = 60; // interval between ping packets in seconds
+    uint16_t            connection_invalidate_delay   = 10; // delay between last pong packet and hangup in seconds
     bool                peer_linker_allow_self_signed = false;
 };
 

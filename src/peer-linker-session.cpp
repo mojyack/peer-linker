@@ -52,10 +52,12 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
 
 auto PeerLinkerSession::start(const PeerLinkerSessionParams& params) -> bool {
     ensure(wss::WebSocketSession::start({
-        .server       = params.peer_linker,
-        .ssl_level    = params.peer_linker_allow_self_signed ? ws::client::SSLLevel::TrustSelfSigned : ws::client::SSLLevel::Enable,
-        .protocol     = "peer-linker",
-        .bind_address = params.bind_address,
+        .server                      = params.peer_linker,
+        .ssl_level                   = params.peer_linker_allow_self_signed ? ws::client::SSLLevel::TrustSelfSigned : ws::client::SSLLevel::Enable,
+        .protocol                    = "peer-linker",
+        .bind_address                = params.bind_address,
+        .connection_check_interval   = params.connection_check_interval,
+        .connection_invalidate_delay = params.connection_invalidate_delay,
     }));
     ensure(start_plink(params));
     return true;

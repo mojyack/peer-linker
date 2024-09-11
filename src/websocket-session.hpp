@@ -23,7 +23,9 @@ struct WebSocketSessionParams {
     ServerLocation       server;
     ws::client::SSLLevel ssl_level = ws::client::SSLLevel::Enable;
     const char*          protocol;
-    const char*          bind_address = nullptr;
+    const char*          bind_address                = nullptr;
+    uint16_t             connection_check_interval   = 60; // interval between ping packets in seconds
+    uint16_t             connection_invalidate_delay = 10; // delay between last pong packet and hangup in seconds
 };
 
 class WebSocketSession {
