@@ -170,7 +170,15 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session = *std::bit_cast<ChannelHubSession*>(ptr);
 
         // remove corresponding channels
-        std::erase_if(server->channels, [&session](const auto& p) { return p.second.session == &session; });
+        auto& channels = server->channels;
+        for(auto i = channels.begin(); i != channels.end(); i = std::next(i)) {
+            const auto& channel = i->second;
+            if(channel.session == &session) {
+                print("unregistering channel ", channel.name);
+                channels.erase(i);
+                break;
+            }
+        }
 
         // remove from pending list
         auto& requests = server->pending_requests;
