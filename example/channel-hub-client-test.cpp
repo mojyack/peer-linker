@@ -43,8 +43,8 @@ auto run(const int argc, const char* const* const argv) -> bool {
     sender.verbose = true;
     sender.set_ws_debug_flags(true, true);
     auto receiver = p2p::chub::ChannelHubReceiver();
-    ensure(sender.start({channel_hub, user_cert, allow_self_signed}));
-    ensure(receiver.start({channel_hub, user_cert, allow_self_signed}));
+    ensure(sender.start({channel_hub, user_cert, {}, allow_self_signed}));
+    ensure(receiver.start({channel_hub, user_cert, {}, allow_self_signed}));
 
     ensure(sender.register_channel("room-1-audio"));
     ensure(sender.register_channel("room-1-video"));

@@ -79,15 +79,14 @@ auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
         handle_raw_packet(payload);
     };
     ensure(websocket_context.init({
-        .address                     = params.server.address.data(),
-        .path                        = "/",
-        .protocol                    = params.protocol,
-        .cert                        = nullptr,
-        .bind_address                = params.bind_address,
-        .port                        = params.server.port,
-        .ssl_level                   = params.ssl_level,
-        .connection_check_interval   = params.connection_check_interval,
-        .connection_invalidate_delay = params.connection_invalidate_delay,
+        .address      = params.server.address.data(),
+        .path         = "/",
+        .protocol     = params.protocol,
+        .cert         = nullptr,
+        .bind_address = params.bind_address,
+        .port         = params.server.port,
+        .ssl_level    = params.ssl_level,
+        .keepalive    = params.keepalive,
     }));
     signaling_worker = std::thread([this]() -> void {
         while(is_connected() && websocket_context.state == ws::client::State::Connected) {

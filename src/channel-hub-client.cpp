@@ -18,11 +18,10 @@ struct EventKind {
 // ChannelHubSession
 auto ChannelHubSession::start(const ChannelHubSessionParams& params) -> bool {
     ensure(wss::WebSocketSession::start({
-        .server                      = params.channel_hub,
-        .ssl_level                   = params.channel_hub_allow_self_signed ? ws::client::SSLLevel::TrustSelfSigned : ws::client::SSLLevel::Enable,
-        .protocol                    = "channel-hub",
-        .connection_check_interval   = params.connection_check_interval,
-        .connection_invalidate_delay = params.connection_invalidate_delay,
+        .server    = params.channel_hub,
+        .ssl_level = params.channel_hub_allow_self_signed ? ws::client::SSLLevel::TrustSelfSigned : ws::client::SSLLevel::Enable,
+        .protocol  = "channel-hub",
+        .keepalive = params.keepalive,
     }));
     ensure(send_packet(::p2p::proto::Type::ActivateSession, params.user_certificate));
     return true;
