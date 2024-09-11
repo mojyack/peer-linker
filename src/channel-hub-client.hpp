@@ -7,6 +7,8 @@ namespace p2p::chub {
 struct ChannelHubSessionParams {
     wss::ServerLocation channel_hub;
     std::string_view    user_certificate              = {};
+    uint16_t            connection_check_interval     = 60; // interval between ping packets in seconds
+    uint16_t            connection_invalidate_delay   = 10; // delay between last pong packet and hangup in seconds
     bool                channel_hub_allow_self_signed = false;
 };
 
