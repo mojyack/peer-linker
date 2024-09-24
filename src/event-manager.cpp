@@ -52,6 +52,7 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<u
     auto value = uint32_t();
     ensure(register_callback(kind, id, [&event, &value](const uint32_t v) {value = v; event.notify(); }));
     event.wait();
+    ensure(value != drained_value);
     return value;
 }
 
