@@ -43,8 +43,9 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<u
         auto guard = std::lock_guard(lock);
         ensure(!drained);
         if(const auto i = std::ranges::find_if(notified, eh_match(kind, id)); i != notified.end()) {
+            const auto value = i->value;
             notified.erase(i);
-            return i->value;
+            return value;
         }
     }
     auto event = Event();
