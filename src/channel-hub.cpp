@@ -154,19 +154,15 @@ finish:
 struct SessionDataInitializer : ws::server::SessionDataInitializer {
     ChannelHub* server;
 
-    auto get_size() -> size_t override {
-        return sizeof(ChannelHubSession);
-    }
-
-    auto init(void* const ptr, lws* wsi) -> void override {
-        print("session created: ", ptr);
-        auto& session  = *new(ptr) ChannelHubSession();
+    auto alloc(lws* wsi) -> void* override {
+        auto& session  = *(new ChannelHubSession());
         session.server = server;
         session.wsi    = wsi;
+        print("session created: ", &session);
+        return &session;
     }
 
-    auto deinit(void* const ptr) -> void override {
-        print("session destroyed: ", ptr);
+    auto free(void* const ptr) -> void override {
         auto& session = *std::bit_cast<ChannelHubSession*>(ptr);
 
         // remove corresponding channels
@@ -198,7 +194,8 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
             }
         }
 
-        session.~ChannelHubSession();
+        delete &session;
+        print("session destroyed: ", &session);
     }
 
     SessionDataInitializer(ChannelHub& server)

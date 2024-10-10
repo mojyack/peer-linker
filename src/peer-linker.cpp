@@ -184,22 +184,19 @@ finish:
 struct SessionDataInitializer : ws::server::SessionDataInitializer {
     PeerLinker* server;
 
-    auto get_size() -> size_t override {
-        return sizeof(PeerLinkerSession);
-    }
-
-    auto init(void* const ptr, lws* wsi) -> void override {
-        print("session created: ", ptr);
-        auto& session  = *new(ptr) PeerLinkerSession();
+    auto alloc(lws* const wsi) -> void* override {
+        auto& session  = *(new PeerLinkerSession());
         session.server = server;
         session.wsi    = wsi;
+        print("session created: ", &session);
+        return &session;
     }
 
-    auto deinit(void* const ptr) -> void override {
-        print("session destroyed: ", ptr);
+    auto free(void* ptr) -> void override {
         auto& session = *std::bit_cast<PeerLinkerSession*>(ptr);
         server->remove_pad(session.pad);
-        session.~PeerLinkerSession();
+        delete &session;
+        print("session destroyed: ", &session);
     }
 
     SessionDataInitializer(PeerLinker& server)
