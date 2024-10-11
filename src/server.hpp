@@ -10,8 +10,8 @@ struct Server {
     bool                      verbose = false;
 
     template <class... Args>
-    auto send_to(lws* const wsi, const uint16_t type, const uint32_t id, Args... args) -> bool {
-        return websocket_context.send(wsi, p2p::proto::build_packet(type, id, args...));
+    auto send_to(ws::server::Client* const client, const uint16_t type, const uint32_t id, Args... args) -> bool {
+        return websocket_context.send(client, p2p::proto::build_packet(type, id, args...));
     }
 };
 

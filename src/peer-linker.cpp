@@ -6,10 +6,10 @@
 namespace p2p::plink {
 namespace {
 struct Pad {
-    std::string name;
-    std::string authenticator_name;
-    lws*        wsi    = nullptr;
-    Pad*        linked = nullptr;
+    std::string         name;
+    std::string         authenticator_name;
+    ws::server::Client* client = nullptr;
+    Pad*                linked = nullptr;
 };
 
 struct Error {
@@ -54,7 +54,7 @@ struct PeerLinker : Server {
             return;
         }
         if(pad->linked) {
-            send_to(pad->linked->wsi, proto::Type::Unlinked, 0);
+            send_to(pad->linked->client, proto::Type::Unlinked, 0);
             pad->linked->linked = nullptr;
         }
         pads.erase(pad->name);
@@ -62,9 +62,9 @@ struct PeerLinker : Server {
 };
 
 struct PeerLinkerSession : Session {
-    PeerLinker* server;
-    lws*        wsi;
-    Pad*        pad = nullptr;
+    PeerLinker*         server;
+    ws::server::Client* client;
+    Pad*                pad = nullptr;
 
     auto handle_payload(std::span<const std::byte> payload) -> bool override;
 };
@@ -92,7 +92,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
         ensure(server->pads.find(name) == server->pads.end(), estr[Error::PadFound]);
 
         print("pad ", name, " registerd");
-        pad = &server->pads.insert(std::pair{name, Pad{std::string(name), "", wsi, nullptr}}).first->second;
+        pad = &server->pads.insert(std::pair{name, Pad{std::string(name), "", client, nullptr}}).first->second;
     } break;
     case proto::Type::Unregister: {
         print("received unregister request");
@@ -118,7 +118,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
         auto& requestee = it->second;
 
         print("sending auth request from ", pad->name, " to ", requestee_name);
-        ensure(server->send_to(requestee.wsi, proto::Type::LinkAuth, 0,
+        ensure(server->send_to(requestee.client, proto::Type::LinkAuth, 0,
                                uint16_t(pad->name.size()),
                                uint16_t(secret.size()),
                                pad->name,
@@ -132,7 +132,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
         ensure(pad->linked != nullptr, estr[Error::NotLinked]);
 
         print("unlinking pad ", pad->name, " and ", pad->linked->name);
-        ensure(server->send_to(pad->linked->wsi, proto::Type::Unlinked, 0));
+        ensure(server->send_to(pad->linked->client, proto::Type::Unlinked, 0));
         pad->linked->linked = nullptr;
         pad->linked         = nullptr;
     } break;
@@ -151,10 +151,10 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
 
         pad->authenticator_name.clear();
         if(packet.ok == 0) {
-            ensure(server->send_to(requester.wsi, proto::Type::LinkDenied, header.id));
+            ensure(server->send_to(requester.client, proto::Type::LinkDenied, header.id));
         } else {
             print("linking ", pad->name, " and ", requester.name);
-            ensure(server->send_to(requester.wsi, proto::Type::LinkSuccess, 0));
+            ensure(server->send_to(requester.client, proto::Type::LinkSuccess, 0));
             pad->linked      = &requester;
             requester.linked = pad;
         }
@@ -171,23 +171,23 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
             print("passthroughing packet from ", pad->name, " to ", pad->linked->name);
         }
 
-        ensure(server->websocket_context.send(pad->linked->wsi, payload));
+        ensure(server->websocket_context.send(pad->linked->client, payload));
         return true;
     }
     }
 
 finish:
-    ensure(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
+    ensure(server->send_to(client, ::p2p::proto::Type::Success, header.id));
     return true;
 }
 
 struct SessionDataInitializer : ws::server::SessionDataInitializer {
     PeerLinker* server;
 
-    auto alloc(lws* const wsi) -> void* override {
+    auto alloc(ws::server::Client* const client) -> void* override {
         auto& session  = *(new PeerLinkerSession());
         session.server = server;
-        session.wsi    = wsi;
+        session.client = client;
         print("session created: ", &session);
         return &session;
     }

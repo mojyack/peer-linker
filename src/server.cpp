@@ -94,8 +94,8 @@ auto run(const int argc, const char* const* const argv,
     server.verbose = args.verbose;
 
     auto& wsctx   = server.websocket_context;
-    wsctx.handler = [&server](lws* wsi, std::span<const std::byte> payload) -> void {
-        auto& session = *std::bit_cast<Session*>(ws::server::wsi_to_userdata(wsi));
+    wsctx.handler = [&server](ws::server::Client* client, std::span<const std::byte> payload) -> void {
+        auto& session = *std::bit_cast<Session*>(ws::server::client_to_userdata(client));
         if(server.verbose) {
             line_print("session ", &session, ": ", "received ", payload.size(), " bytes");
         }
@@ -105,9 +105,9 @@ auto run(const int argc, const char* const* const argv,
             const auto& header_o = p2p::proto::extract_header(payload);
             if(!header_o) {
                 line_warn("packet too short");
-                ensure_v(server.send_to(wsi, p2p::proto::Type::Error, 0));
+                ensure_v(server.send_to(client, p2p::proto::Type::Error, 0));
             } else {
-                ensure_v(server.send_to(wsi, p2p::proto::Type::Error, header_o->id));
+                ensure_v(server.send_to(client, p2p::proto::Type::Error, header_o->id));
             }
         }
     };

@@ -40,8 +40,8 @@ const auto estr = std::array{
 static_assert(Error::Limit == estr.size());
 
 struct ChannelHubSession : Session {
-    ChannelHub* server;
-    lws*        wsi;
+    ChannelHub*         server;
+    ws::server::Client* client;
 
     auto handle_payload(std::span<const std::byte> payload) -> bool override;
 };
@@ -107,7 +107,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
             std::memcpy(payload.data() + prev_size, name.data(), name.size() + 1);
         }
 
-        ensure(server->send_to(wsi, proto::Type::GetChannelsResponse, header.id, payload));
+        ensure(server->send_to(client, proto::Type::GetChannelsResponse, header.id, payload));
         return true;
     } break;
     case proto::Type::PadRequest: {
@@ -124,7 +124,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         auto& channel = it->second;
 
         const auto id = server->packet_id += 1;
-        ensure(server->send_to(channel.session->wsi, proto::Type::PadRequest, id, name));
+        ensure(server->send_to(channel.session->client, proto::Type::PadRequest, id, name));
         server->pending_requests.insert({id, PendingRequest{.requester = this, .requestee = channel.session}});
     } break;
     case proto::Type::PadRequestResponse: {
@@ -139,7 +139,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         server->pending_requests.erase(request_it);
 
         print("sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
-        ensure(server->send_to(request.requester->wsi, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
+        ensure(server->send_to(request.requester->client, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
     } break;
     default: {
         bail("unknown command ", int(header.type));
@@ -147,17 +147,17 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
     }
 
 finish:
-    ensure(server->send_to(wsi, ::p2p::proto::Type::Success, header.id));
+    ensure(server->send_to(client, ::p2p::proto::Type::Success, header.id));
     return true;
 }
 
 struct SessionDataInitializer : ws::server::SessionDataInitializer {
     ChannelHub* server;
 
-    auto alloc(lws* wsi) -> void* override {
+    auto alloc(ws::server::Client* client) -> void* override {
         auto& session  = *(new ChannelHubSession());
         session.server = server;
-        session.wsi    = wsi;
+        session.client = client;
         print("session created: ", &session);
         return &session;
     }
@@ -188,7 +188,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
             } else if(request.requestee == &session) {
                 // pad requestee has gone.
                 // delete request and send fail to requester
-                server->send_to(request.requester->wsi, proto::Type::PadRequestResponse, 0, uint16_t(0));
+                server->send_to(request.requester->client, proto::Type::PadRequestResponse, 0, uint16_t(0));
                 requests.erase(i);
                 break;
             }
