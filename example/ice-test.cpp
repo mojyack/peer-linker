@@ -12,16 +12,25 @@ const auto server_domain     = "localhost";
 const auto server_port       = 8080;
 auto       user_cert         = std::string();
 auto       allow_self_signed = false;
+auto       message_count     = 5;
 
 class ClientSession : public p2p::ice::IceSession {
     auto get_auth_secret() -> std::vector<std::byte> override {
-        auto secret = std::vector<std::byte>(strlen("password") + 1);
-        std::strcpy((char*)secret.data(), "password");
+        static const auto password = to_span("password");
+
+        auto secret = std::vector<std::byte>(password.size());
+        std::memcpy(secret.data(), password.data(), secret.size());
         return secret;
     }
 
     auto auth_peer(std::string_view peer_name, std::span<const std::byte> secret) -> bool override {
-        return peer_name == "agent a" && std::strcmp((char*)secret.data(), "password") == 0;
+        auto s = from_span(secret);
+        print("secret=", s, " ", s.size(), s == "password");
+        return peer_name == "agent a" && from_span(secret) == "password";
+    }
+
+    auto on_p2p_packet_received(const std::span<const std::byte> payload) -> void override {
+        print("received p2p message: ", from_span(payload));
     }
 };
 
@@ -41,6 +50,10 @@ auto main(const bool controlling) -> bool {
                              .user_certificate              = user_cert,
                              .peer_linker_allow_self_signed = allow_self_signed,
                          }));
+    for(auto i = 0; i < message_count; i += 1) {
+        session.send_packet_p2p(to_span("Hello!"));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
     return true;
 }
 
@@ -53,6 +66,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
     parser.kwarg(&help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
     parser.kwarg(&cert_file, {"-k"}, {"CERT_FILE", "use user certificate", args::State::Initialized});
     parser.kwarg(&allow_self_signed, {"-a"}, {"", "allow self signed ssl certificate", args::State::Initialized});
+    parser.kwarg(&message_count, {"-c"}, {"COUNT", "number of messages to send", args::State::DefaultValue});
     parser.kwarg(&role, {"-r", "--role"}, {"ROLE(both|server|client)", "test target", args::State::DefaultValue});
     if(!parser.parse(argc, argv) || help) {
         print("usage: peer-linker-test ", parser.get_help());
