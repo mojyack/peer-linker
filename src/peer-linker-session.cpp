@@ -76,7 +76,7 @@ auto PeerLinkerSession::start_plink(const PeerLinkerSessionParams& params) -> bo
                            params.target_pad_name,
                            secret));
     }
-    unwrap(link_result, wait_for_event(EventKind::Linked));
+    unwrap(link_result, events.wait_for(EventKind::Linked));
     ensure(link_result == 1);
     return true;
 }

@@ -44,7 +44,6 @@ class WebSocketSession {
     virtual auto on_disconnected() -> void;
 
     auto is_connected() const -> bool;
-    auto wait_for_event(uint32_t kind, uint32_t id = no_id) -> std::optional<uint32_t>;
     // all subclasses must call destroy in their destructor
     auto destroy() -> void;
 

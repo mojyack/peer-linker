@@ -36,7 +36,7 @@ auto WebSocketSession::send_packet(std::vector<std::byte> payload) -> bool {
 
     std::bit_cast<proto::Packet*>(payload.data())->id = id;
     ensure(websocket_context.send(payload));
-    unwrap(value, wait_for_event(EventKind::Result, id));
+    unwrap(value, events.wait_for(EventKind::Result, id));
     ensure(value == 1);
     return true;
 }
@@ -56,12 +56,6 @@ auto WebSocketSession::on_disconnected() -> void {
 
 auto WebSocketSession::is_connected() const -> bool {
     return !events.is_drained();
-}
-
-auto WebSocketSession::wait_for_event(const uint32_t kind, const uint32_t id) -> std::optional<uint32_t> {
-    unwrap(result, events.wait_for(kind, id));
-    ensure(result != drained_value);
-    return result;
 }
 
 auto WebSocketSession::destroy() -> void {

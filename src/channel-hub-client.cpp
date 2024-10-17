@@ -111,7 +111,7 @@ auto ChannelHubReceiver::on_packet_received(const std::span<const std::byte> pay
 auto ChannelHubReceiver::get_channels() -> std::optional<std::vector<std::string>> {
     const auto id = allocate_packet_id();
     send_generic_packet(proto::Type::GetChannels, id);
-    ensure(wait_for_event(EventKind::Channels, id));
+    ensure(events.wait_for(EventKind::Channels, id));
 
     const auto channels_str = std::exchange(channels_buffer, {});
     auto       channels     = std::vector<std::string>();
@@ -131,7 +131,7 @@ auto ChannelHubReceiver::get_channels() -> std::optional<std::vector<std::string
 auto ChannelHubReceiver::request_pad(const std::string_view channel_name) -> std::optional<std::string> {
     const auto id = allocate_packet_id();
     send_generic_packet(proto::Type::PadRequest, id, channel_name);
-    unwrap(result, wait_for_event(EventKind::PadCreated));
+    unwrap(result, events.wait_for(EventKind::PadCreated));
     ensure(result == 1);
     return pad_name_buffer;
 }
