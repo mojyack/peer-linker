@@ -42,16 +42,16 @@ executable('session-key-util',
 )
 
 if get_option('client')
-  executable('peer-linker-test',
+  executable('ice-test',
     files(
-      'example/peer-linker-test.cpp',
+      'example/ice-test.cpp',
     ) + p2p_client_ice_files,
     dependencies : p2p_client_ice_deps,
   )
 
-  executable('channel-hub-client-test',
+  executable('channel-hub-test',
     files(
-      'example/channel-hub-client-test.cpp',
+      'example/channel-hub-test.cpp',
     ) + p2p_client_chub_files,
     dependencies : p2p_client_chub_deps,
   )
