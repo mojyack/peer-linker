@@ -9,7 +9,7 @@ declare_autoptr(JuiceAgent, juice_agent_t, juice_destroy);
 struct EventKind {
     enum {
         Connected = plink::EventKind::Limit,
-        SDPSet,
+        SessionDescSet,
         RemoteGatheringDone,
 
         Limit,
@@ -24,7 +24,7 @@ struct IceSessionParams {
 class IceSession : public plink::PeerLinkerSession {
   private:
     AutoJuiceAgent agent;
-    std::string    remote_sdp;
+    std::string    remote_desc;
 
   protected:
     virtual auto on_packet_received(std::span<const std::byte> payload) -> bool override;
@@ -32,7 +32,7 @@ class IceSession : public plink::PeerLinkerSession {
   public:
     // internal use
     auto on_p2p_connected_state(bool flag) -> void;
-    auto on_p2p_new_candidate(std::string_view sdp) -> void;
+    auto on_p2p_new_candidate(std::string_view desc) -> void;
     auto on_p2p_gathering_done() -> void;
 
     // api

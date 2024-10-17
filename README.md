@@ -7,7 +7,7 @@ This repository contains:
 
 to establish p2p connections.  
 ## Peer Linker
-peer-linker is a data relay server that two peers can use to exchange SDP and other data.  
+peer-linker is a data relay server that two peers can use to perform SDP and other data.  
 A peer can establish relay connection by registering itself as a pad in the peer-linker and linking it to another pad.
 ## Channel Hub
 channel-hub is an auxiliary server that helps peers to dynamically create pads.  

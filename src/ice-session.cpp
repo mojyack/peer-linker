@@ -21,8 +21,8 @@ auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state,
     }
 }
 
-auto on_candidate(juice_agent_t* const /*agent*/, const char* const sdp, void* const user_ptr) -> void {
-    std::bit_cast<IceSession*>(user_ptr)->on_p2p_new_candidate(std::string_view(sdp));
+auto on_candidate(juice_agent_t* const /*agent*/, const char* const desc, void* const user_ptr) -> void {
+    std::bit_cast<IceSession*>(user_ptr)->on_p2p_new_candidate(std::string_view(desc));
 }
 
 auto on_gathering_done(juice_agent_t* const /*agent*/, void* const user_ptr) -> void {
@@ -38,23 +38,23 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
     unwrap(header, p2p::proto::extract_header(payload));
 
     switch(header.type) {
-    case proto::Type::SetCandidates: {
-        const auto sdp = p2p::proto::extract_last_string<proto::SetCandidates>(payload);
+    case proto::Type::SessionDescription: {
+        const auto desc = p2p::proto::extract_last_string<proto::SessionDescription>(payload);
         if(verbose) {
-            line_print("received remote candidates: ", sdp);
+            line_print("received remote candidates: ", desc);
         }
-        remote_sdp = sdp;
-        events.invoke(EventKind::SDPSet, no_id, no_value);
+        remote_desc = desc;
+        events.invoke(EventKind::SessionDescSet, no_id, no_value);
 
         send_result(::p2p::proto::Type::Success, header.id);
         return true;
     }
-    case proto::Type::AddCandidates: {
-        const auto sdp = p2p::proto::extract_last_string<proto::AddCandidates>(payload);
+    case proto::Type::Candidate: {
+        const auto desc = p2p::proto::extract_last_string<proto::Candidate>(payload);
         if(verbose) {
-            line_print("received additional candidates: ", sdp);
+            line_print("received additional candidates: ", desc);
         }
-        juice_add_remote_candidate(agent.get(), sdp.data());
+        juice_add_remote_candidate(agent.get(), desc.data());
 
         send_result(::p2p::proto::Type::Success, header.id);
         return true;
@@ -82,12 +82,12 @@ auto IceSession::on_p2p_connected_state(const bool flag) -> void {
     }
 }
 
-auto IceSession::on_p2p_new_candidate(const std::string_view sdp) -> void {
+auto IceSession::on_p2p_new_candidate(const std::string_view desc) -> void {
     if(verbose) {
-        line_print("new candidate: ", sdp);
+        line_print("new candidate: ", desc);
     }
     send_packet_detached(
-        proto::Type::AddCandidates, [](uint32_t result) { ensure_v(result, "failed to send new candidate"); }, sdp);
+        proto::Type::Candidate, [](uint32_t result) { ensure_v(result, "failed to send new candidate"); }, desc);
 }
 
 auto IceSession::on_p2p_gathering_done() -> void {
@@ -131,19 +131,19 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
     }
     agent.reset(juice_create(&config));
     if(controlled) {
-        ensure(events.wait_for(EventKind::SDPSet));
-        juice_set_remote_description(agent.get(), remote_sdp.data());
+        ensure(events.wait_for(EventKind::SessionDescSet));
+        juice_set_remote_description(agent.get(), remote_desc.data());
     }
 
-    auto sdp = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
-    ensure(juice_get_local_description(agent.get(), sdp.data(), sdp.size()) == JUICE_ERR_SUCCESS);
+    auto desc = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
+    ensure(juice_get_local_description(agent.get(), desc.data(), desc.size()) == JUICE_ERR_SUCCESS);
     if(verbose) {
-        line_print(plink_params.pad_name, "local sdp: ", sdp.data());
+        line_print(plink_params.pad_name, " local session desc: ", desc.data());
     }
-    ensure(send_packet(proto::Type::SetCandidates, std::string_view(sdp.data())));
+    ensure(send_packet(proto::Type::SessionDescription, std::string_view(desc.data())));
     if(!controlled) {
-        ensure(events.wait_for(EventKind::SDPSet));
-        juice_set_remote_description(agent.get(), remote_sdp.data());
+        ensure(events.wait_for(EventKind::SessionDescSet));
+        juice_set_remote_description(agent.get(), remote_desc.data());
     }
 
     juice_gather_candidates(agent.get());

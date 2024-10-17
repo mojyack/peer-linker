@@ -4,20 +4,20 @@
 namespace p2p::ice::proto {
 struct Type {
     enum : uint16_t {
-        SetCandidates = ::p2p::plink::proto::Type::Limit,
-        AddCandidates,
+        SessionDescription = ::p2p::plink::proto::Type::Limit,
+        Candidate,
         GatheringDone,
 
         Limit,
     };
 };
 
-struct SetCandidates : ::p2p::proto::Packet {
-    // char sdp[];
+struct SessionDescription : ::p2p::proto::Packet {
+    // char desc[];
 };
 
-struct AddCandidates : ::p2p::proto::Packet {
-    // char sdp[];
+struct Candidate : ::p2p::proto::Packet {
+    // char desc[];
 };
 
 struct GatheringDone : ::p2p::proto::Packet {
