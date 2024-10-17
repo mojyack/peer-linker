@@ -1,9 +1,9 @@
 subdir('ws')
 
 p2p_client_common_files = files(
-  'websocket-session.cpp',
-  'peer-linker-session.cpp',
   'event-manager.cpp',
+  'peer-linker-session.cpp',
+  'websocket-session.cpp',
 ) + ws_files + ws_client_files
 p2p_client_common_deps = ws_deps
 
