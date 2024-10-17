@@ -38,7 +38,7 @@ auto Events::register_callback(const uint32_t kind, const uint32_t id, const Eve
     return true;
 }
 
-auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<uint32_t> {
+auto Events::wait_for(const uint32_t kind, const uint32_t id, const bool report_drain) -> std::optional<uint32_t> {
     {
         auto guard = std::lock_guard(lock);
         ensure(!drained);
@@ -52,7 +52,7 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id) -> std::optional<u
     auto value = uint32_t();
     ensure(register_callback(kind, id, [&event, &value](const uint32_t v) {value = v; event.notify(); }));
     event.wait();
-    ensure(value != drained_value);
+    ensure(report_drain || value != drained_value);
     return value;
 }
 
