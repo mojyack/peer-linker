@@ -132,7 +132,7 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
     agent.reset(juice_create(&config));
     if(controlled) {
         ensure(events.wait_for(EventKind::SessionDescSet));
-        juice_set_remote_description(agent.get(), remote_desc.data());
+        ensure(juice_set_remote_description(agent.get(), remote_desc.data()) == JUICE_ERR_SUCCESS);
     }
 
     auto desc = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
@@ -143,10 +143,10 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
     ensure(send_packet(proto::Type::SessionDescription, std::string_view(desc.data())));
     if(!controlled) {
         ensure(events.wait_for(EventKind::SessionDescSet));
-        juice_set_remote_description(agent.get(), remote_desc.data());
+        ensure(juice_set_remote_description(agent.get(), remote_desc.data()) == JUICE_ERR_SUCCESS);
     }
 
-    juice_gather_candidates(agent.get());
+    ensure(juice_gather_candidates(agent.get()) == JUICE_ERR_SUCCESS);
     // seems not mandatory
     // ensure(events.wait_for(EventKind::RemoteGatheringDone));
     ensure(events.wait_for(EventKind::Connected));
