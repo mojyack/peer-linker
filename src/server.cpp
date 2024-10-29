@@ -61,16 +61,16 @@ struct ServerArgs {
 auto ServerArgs::parse(const int argc, const char* const* const argv, std::string_view program_name, uint16_t default_port) -> std::optional<ServerArgs> {
     auto args   = ServerArgs{.port = default_port};
     auto parser = args::Parser<uint16_t, uint8_t>();
-    parser.kwarg(&args.help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
-    parser.kwarg(&args.port, {"-p"}, {"PORT", "port number to use", args::State::DefaultValue});
-    parser.kwarg(&args.session_key_secret_file, {"-k", "--key"}, {"FILE", "enable user verification with the secret file", args::State::Initialized});
-    parser.kwarg(&args.user_cert_verifier, {"-c", "--cert-verifier"}, {"EXEC", "full-path of executable to verify user certificate", args::State::Initialized});
-    parser.kwarg(&args.ssl_cert_file, {"-sc", "--ssl-cert"}, {"FILE", "ssl certificate file", args::State::Initialized});
-    parser.kwarg(&args.ssl_key_file, {"-sk", "--ssl-key"}, {"FILE", "ssk private key file", args::State::Initialized});
-    parser.kwarg(&args.verbose, {"-v"}, {.arg_desc = "enable signaling server debug output", .state = args::State::Initialized});
-    parser.kwarg(&args.websocket_verbose, {"-wv"}, {.arg_desc = "enable websocket debug output", .state = args::State::Initialized});
-    parser.kwarg(&args.websocket_dump_packets, {"-wd"}, {.arg_desc = "dump every websocket packets", .state = args::State::Initialized});
-    parser.kwarg(&args.libws_debug_bitmap, {"-wb"}, {"BITMAP", "libwebsockets debug flag bitmap", args::State::DefaultValue});
+    parser.kwflag(&args.help, {"-h", "--help"}, "print this help message", {.no_error_check = true});
+    parser.kwarg(&args.port, {"-p"}, "PORT", "port number to use", {.state = args::State::DefaultValue});
+    parser.kwarg(&args.session_key_secret_file, {"-k", "--key"}, "FILE", "enable user verification with the secret file", {.state = args::State::Initialized});
+    parser.kwarg(&args.user_cert_verifier, {"-c", "--cert-verifier"}, "EXEC", "full-path of executable to verify user certificate", {.state = args::State::Initialized});
+    parser.kwarg(&args.ssl_cert_file, {"-sc", "--ssl-cert"}, "FILE", "ssl certificate file", {.state = args::State::Initialized});
+    parser.kwarg(&args.ssl_key_file, {"-sk", "--ssl-key"}, "FILE", "ssk private key file", {.state = args::State::Initialized});
+    parser.kwflag(&args.verbose, {"-v"}, "enable signaling server debug output");
+    parser.kwflag(&args.websocket_verbose, {"-wv"}, "enable websocket debug output");
+    parser.kwflag(&args.websocket_dump_packets, {"-wd"}, "dump every websocket packets");
+    parser.kwarg(&args.libws_debug_bitmap, {"-wb"}, "BITMAP", "libwebsockets debug flag bitmap", {.state = args::State::DefaultValue});
     if(!parser.parse(argc, argv) || args.help) {
         print("usage: ", program_name, " ", parser.get_help());
         std::exit(0);

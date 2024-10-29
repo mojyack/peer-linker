@@ -29,11 +29,11 @@ auto main(const int argc, const char* const* const argv) -> int {
     auto file   = (const char*)(nullptr);
     auto verify = false;
     auto help   = false;
-    auto parser = args::Parser();
-    parser.kwarg(&verify, {"-d", "--verify"}, {"", "verify user certificate", args::State::Initialized});
-    parser.kwarg(&help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
-    parser.arg(&secret, {"SECRET_FILE"});
-    parser.arg(&file, {"TARGET_FILE"});
+    auto parser = args::Parser<>();
+    parser.kwflag(&verify, {"-d", "--verify"}, "verify user certificate");
+    parser.kwflag(&help, {"-h", "--help"}, "print this help message", {.no_error_check = true});
+    parser.arg(&secret, "SECRET_FILE", "path to key file");
+    parser.arg(&file, "TARGET_FILE", "path to data or cert file");
     if(!parser.parse(argc, argv) || help) {
         print("usage: session-key-util ", parser.get_help());
         return 1;

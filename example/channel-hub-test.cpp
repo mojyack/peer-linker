@@ -23,9 +23,9 @@ auto run(const int argc, const char* const* const argv) -> bool {
     auto help              = false;
 
     auto parser = args::Parser<uint16_t, uint8_t>();
-    parser.kwarg(&help, {"-h", "--help"}, {.arg_desc = "print this help message", .state = args::State::Initialized, .no_error_check = true});
-    parser.kwarg(&cert_file, {"-k"}, {"CERT_FILE", "use user certificate", args::State::Initialized});
-    parser.kwarg(&allow_self_signed, {"-a"}, {"", "allow self signed ssl certificate", args::State::Initialized});
+    parser.kwflag(&help, {"-h", "--help"}, "print this help message", {.no_error_check = true});
+    parser.kwarg(&cert_file, {"-k"}, "CERT_FILE", "use user certificate", {args::State::Initialized});
+    parser.kwflag(&allow_self_signed, {"-a"}, "allow self signed ssl certificate");
     if(!parser.parse(argc, argv) || help) {
         print("usage: channel-hub-client-test ", parser.get_help());
         return true;
