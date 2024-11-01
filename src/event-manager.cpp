@@ -2,8 +2,15 @@
 #include <utility>
 
 #include "event-manager.hpp"
-#include "macros/assert.hpp"
 #include "util/event.hpp"
+#include "util/logger.hpp"
+
+#define CUTIL_MACROS_PRINT_FUNC logger.error
+#include "macros/assert.hpp"
+
+namespace {
+auto logger = Logger("event_manager");
+}
 
 namespace p2p {
 auto Events::eh_match(const uint32_t kind, const uint32_t id) -> auto {
@@ -11,9 +18,7 @@ auto Events::eh_match(const uint32_t kind, const uint32_t id) -> auto {
 }
 
 auto Events::register_callback(const uint32_t kind, const uint32_t id, const EventCallback callback) -> bool {
-    if(debug) {
-        line_print("new event handler registered kind: ", kind, " id: ", id);
-    }
+    logger.debug("new event handler registered kind: ", kind, " id: ", id);
 
     auto value = std::optional<uint32_t>();
     {
@@ -57,12 +62,10 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id, const bool report_
 }
 
 auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
-    if(debug) {
-        if(id != no_id) {
-            line_print("new event kind: ", kind, " id: ", id, " value: ", value);
-        } else {
-            line_print("new event kind: ", kind, " value: ", value);
-        }
+    if(id != no_id) {
+        logger.debug("new event kind: ", kind, " id: ", id, " value: ", value);
+    } else {
+        logger.debug("new event kind: ", kind, " value: ", value);
     }
 
     auto found = std::optional<Handler>();
@@ -82,9 +85,7 @@ auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> v
 }
 
 auto Events::drain() -> bool {
-    if(debug) {
-        line_print("draining...");
-    }
+    logger.debug("draining...");
 
     {
         auto guard = std::lock_guard(lock);

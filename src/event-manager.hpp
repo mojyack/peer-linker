@@ -29,8 +29,6 @@ class Events {
     auto eh_match(const uint32_t kind, const uint32_t id) -> auto;
 
   public:
-    bool debug = false;
-
     // register_callback and wait_for are exclusive
     auto register_callback(uint32_t kind, uint32_t id, EventCallback callback) -> bool;
     auto wait_for(uint32_t kind, uint32_t id = no_id, bool report_drain = false) -> std::optional<uint32_t>;
