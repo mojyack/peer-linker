@@ -101,8 +101,7 @@ auto WebSocketSession::stop() -> void {
     on_disconnected();
 }
 
-auto WebSocketSession::set_ws_debug_flags(const bool verbose, const bool dump_packets) -> void {
-    websocket_context.verbose      = verbose;
-    websocket_context.dump_packets = dump_packets;
+auto WebSocketSession::set_ws_dump_packets(const bool flag) -> void {
+    websocket_context.dump_packets = flag;
 }
 } // namespace p2p::wss

@@ -51,7 +51,6 @@ struct ServerArgs {
     uint16_t    port                    = 0;
     bool        help                    = false;
     bool        verbose                 = false;
-    bool        websocket_verbose       = false;
     bool        websocket_dump_packets  = false;
     uint8_t     libws_debug_bitmap      = 0b11; // LLL_ERR | LLL_WARN
 
@@ -68,7 +67,6 @@ auto ServerArgs::parse(const int argc, const char* const* const argv, std::strin
     parser.kwarg(&args.ssl_cert_file, {"-sc", "--ssl-cert"}, "FILE", "ssl certificate file", {.state = args::State::Initialized});
     parser.kwarg(&args.ssl_key_file, {"-sk", "--ssl-key"}, "FILE", "ssk private key file", {.state = args::State::Initialized});
     parser.kwflag(&args.verbose, {"-v"}, "enable signaling server debug output");
-    parser.kwflag(&args.websocket_verbose, {"-wv"}, "enable websocket debug output");
     parser.kwflag(&args.websocket_dump_packets, {"-wd"}, "dump every websocket packets");
     parser.kwarg(&args.libws_debug_bitmap, {"-wb"}, "BITMAP", "libwebsockets debug flag bitmap", {.state = args::State::DefaultValue});
     if(!parser.parse(argc, argv) || args.help) {
@@ -112,7 +110,6 @@ auto run(const int argc, const char* const* const argv,
         }
     };
     wsctx.session_data_initer = std::move(session_initer);
-    wsctx.verbose             = args.websocket_verbose;
     wsctx.dump_packets        = args.websocket_dump_packets;
     ws::set_log_level(args.libws_debug_bitmap);
     ensure(wsctx.init({

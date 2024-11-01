@@ -41,7 +41,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
 
     auto sender    = ChannelHubSender();
     sender.verbose = true;
-    sender.set_ws_debug_flags(true, true);
+    sender.set_ws_dump_packets(true);
     auto receiver = p2p::chub::ChannelHubReceiver();
     ensure(sender.start({channel_hub, user_cert, {}, allow_self_signed}));
     ensure(receiver.start({channel_hub, user_cert, {}, allow_self_signed}));

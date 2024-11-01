@@ -52,7 +52,7 @@ class WebSocketSession {
 
     auto start(const WebSocketSessionParams& params) -> bool;
     auto stop() -> void;
-    auto set_ws_debug_flags(bool verbose, bool dump_packets) -> void;
+    auto set_ws_dump_packets(bool flag) -> void;
 
     auto allocate_packet_id() -> uint32_t {
         return packet_id += 1;
