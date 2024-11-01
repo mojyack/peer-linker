@@ -3,12 +3,14 @@
 #include <optional>
 #include <string_view>
 
-#include "macros/unwrap.hpp"
 #include "protocol-helper.hpp"
 #include "server.hpp"
 #include "util/argument-parser.hpp"
 #include "util/file-io.hpp"
 #include "ws/misc.hpp"
+
+#define CUTIL_MACROS_PRINT_FUNC logger.error
+#include "macros/unwrap.hpp"
 
 #if defined(_WIN32)
 #include "spawn/process-win.hpp"
@@ -17,6 +19,7 @@
 #endif
 
 auto Session::activate(Server& server, const std::string_view cert) -> bool {
+    auto& logger = server.logger;
     if(auto& key = server.session_key) {
         unwrap(parsed, key->split_user_certificate_to_hash_and_content(cert));
         const auto [hash_str, content] = parsed;
@@ -79,6 +82,7 @@ auto run(const int argc, const char* const* const argv,
          Server&                                             server,
          std::unique_ptr<ws::server::SessionDataInitializer> session_initer,
          const char* const                                   protocol) -> bool {
+    auto& logger = server.logger;
     unwrap(args, ServerArgs::parse(argc, argv, protocol, default_port));
     if(args.session_key_secret_file != nullptr) {
         unwrap(secret, read_file(args.session_key_secret_file), "failed to read session key secret file");
@@ -89,7 +93,7 @@ auto run(const int argc, const char* const* const argv,
     }
 
     auto& wsctx   = server.websocket_context;
-    wsctx.handler = [&server](ws::server::Client* client, std::span<const std::byte> payload) -> void {
+    wsctx.handler = [&server, &logger](ws::server::Client* client, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::client_to_userdata(client));
         server.logger.debug("session ", &session, ": ", "received ", payload.size(), " bytes");
         if(!session.handle_payload(payload)) {
