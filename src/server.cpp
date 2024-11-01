@@ -50,7 +50,6 @@ struct ServerArgs {
     const char* ssl_key_file            = nullptr;
     uint16_t    port                    = 0;
     bool        help                    = false;
-    bool        verbose                 = false;
     bool        websocket_dump_packets  = false;
     uint8_t     libws_debug_bitmap      = 0b11; // LLL_ERR | LLL_WARN
 
@@ -66,7 +65,6 @@ auto ServerArgs::parse(const int argc, const char* const* const argv, std::strin
     parser.kwarg(&args.user_cert_verifier, {"-c", "--cert-verifier"}, "EXEC", "full-path of executable to verify user certificate", {.state = args::State::Initialized});
     parser.kwarg(&args.ssl_cert_file, {"-sc", "--ssl-cert"}, "FILE", "ssl certificate file", {.state = args::State::Initialized});
     parser.kwarg(&args.ssl_key_file, {"-sk", "--ssl-key"}, "FILE", "ssk private key file", {.state = args::State::Initialized});
-    parser.kwflag(&args.verbose, {"-v"}, "enable signaling server debug output");
     parser.kwflag(&args.websocket_dump_packets, {"-wd"}, "dump every websocket packets");
     parser.kwarg(&args.libws_debug_bitmap, {"-wb"}, "BITMAP", "libwebsockets debug flag bitmap", {.state = args::State::DefaultValue});
     if(!parser.parse(argc, argv) || args.help) {
@@ -89,20 +87,17 @@ auto run(const int argc, const char* const* const argv,
     if(args.user_cert_verifier != nullptr) {
         server.user_cert_verifier = std::filesystem::absolute(args.user_cert_verifier).string();
     }
-    server.verbose = args.verbose;
 
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server](ws::server::Client* client, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::client_to_userdata(client));
-        if(server.verbose) {
-            line_print("session ", &session, ": ", "received ", payload.size(), " bytes");
-        }
+        server.logger.debug("session ", &session, ": ", "received ", payload.size(), " bytes");
         if(!session.handle_payload(payload)) {
-            line_warn("payload handling failed");
+            server.logger.error("payload handling failed");
 
             const auto& header_o = p2p::proto::extract_header(payload);
             if(!header_o) {
-                line_warn("packet too short");
+                server.logger.error("packet too short");
                 ensure_v(server.send_to(client, p2p::proto::Type::Error, 0));
             } else {
                 ensure_v(server.send_to(client, p2p::proto::Type::Error, header_o->id));

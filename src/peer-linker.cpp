@@ -1,7 +1,9 @@
-#include "macros/unwrap.hpp"
 #include "peer-linker-protocol.hpp"
 #include "server.hpp"
 #include "util/string-map.hpp"
+
+#define CUTIL_MACROS_PRINT_FUNC logger.error
+#include "macros/unwrap.hpp"
 
 namespace p2p::plink {
 namespace {
@@ -70,13 +72,15 @@ struct PeerLinkerSession : Session {
 };
 
 auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload) -> bool {
+    auto& logger = server->logger;
+
     unwrap(header, p2p::proto::extract_header(payload));
 
     if(header.type == ::p2p::proto::Type::ActivateSession) {
         const auto cert = p2p::proto::extract_last_string<proto::Register>(payload);
-        print("received activate session");
+        logger.info("received activate session");
         ensure(activate(*server, cert), "failed to verify user certificate");
-        print("session activated");
+        logger.info("session activated");
         goto finish;
     } else {
         ensure(activated, estr[Error::NotActivated]);
@@ -85,21 +89,21 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
     switch(header.type) {
     case proto::Type::Register: {
         const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
-        print("received pad register request name: ", name);
+        logger.info("received pad register request name=", name);
 
         ensure(!name.empty(), estr[Error::EmptyPadName]);
         ensure(pad == nullptr, estr[Error::AlreadyRegistered]);
         ensure(server->pads.find(name) == server->pads.end(), estr[Error::PadFound]);
 
-        print("pad ", name, " registerd");
+        logger.info("pad ", name, " registerd");
         pad = &server->pads.insert(std::pair{name, Pad{std::string(name), "", client, nullptr}}).first->second;
     } break;
     case proto::Type::Unregister: {
-        print("received unregister request");
+        logger.info("received unregister request");
 
         ensure(pad != nullptr, estr[Error::NotRegistered]);
 
-        print("unregistering pad ", pad->name);
+        logger.info("unregistering pad ", pad->name);
         server->remove_pad(pad);
         pad = nullptr;
     } break;
@@ -108,7 +112,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
         ensure(sizeof(proto::Link) + packet.requestee_name_len + packet.secret_len == payload.size());
         const auto requestee_name = std::string_view(std::bit_cast<char*>(payload.data() + sizeof(proto::Link)), packet.requestee_name_len);
         const auto secret         = std::span(payload.data() + sizeof(proto::Link) + packet.requestee_name_len, packet.secret_len);
-        print("received pad link request to ", requestee_name);
+        logger.info("received pad link request to ", requestee_name);
 
         ensure(pad != nullptr, estr[Error::NotRegistered]);
         ensure(pad->linked == nullptr, estr[Error::AlreadyLinked]);
@@ -117,7 +121,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
         ensure(it != server->pads.end(), estr[Error::PadNotFound]);
         auto& requestee = it->second;
 
-        print("sending auth request from ", pad->name, " to ", requestee_name);
+        logger.info("sending auth request from ", pad->name, " to ", requestee_name);
         ensure(server->send_to(requestee.client, proto::Type::LinkAuth, 0,
                                uint16_t(pad->name.size()),
                                uint16_t(secret.size()),
@@ -126,12 +130,12 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
         pad->authenticator_name = requestee.name;
     } break;
     case proto::Type::Unlink: {
-        print("received unlink request");
+        logger.info("received unlink request");
 
         ensure(pad != nullptr, estr[Error::NotRegistered]);
         ensure(pad->linked != nullptr, estr[Error::NotLinked]);
 
-        print("unlinking pad ", pad->name, " and ", pad->linked->name);
+        logger.info("unlinking pad ", pad->name, " and ", pad->linked->name);
         ensure(server->send_to(pad->linked->client, proto::Type::Unlinked, 0));
         pad->linked->linked = nullptr;
         pad->linked         = nullptr;
@@ -139,7 +143,7 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
     case proto::Type::LinkAuthResponse: {
         unwrap(packet, p2p::proto::extract_payload<proto::LinkAuthResponse>(payload));
         const auto requester_name = p2p::proto::extract_last_string<proto::LinkAuthResponse>(payload);
-        print("received link auth to name: ", requester_name, " ok: ", int(packet.ok));
+        logger.info("received link auth to name: ", requester_name, " ok: ", int(packet.ok));
 
         ensure(pad != nullptr, estr[Error::NotRegistered]);
 
@@ -153,24 +157,18 @@ auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload)
         if(packet.ok == 0) {
             ensure(server->send_to(requester.client, proto::Type::LinkDenied, header.id));
         } else {
-            print("linking ", pad->name, " and ", requester.name);
+            logger.info("linking ", pad->name, " and ", requester.name);
             ensure(server->send_to(requester.client, proto::Type::LinkSuccess, 0));
             pad->linked      = &requester;
             requester.linked = pad;
         }
     } break;
     default: {
-        if(server->verbose) {
-            print("received general command ", int(header.type));
-        }
-
+        logger.debug("received general command ", int(header.type));
         ensure(pad != nullptr, estr[Error::NotRegistered]);
         ensure(pad->linked != nullptr, estr[Error::NotLinked]);
 
-        if(server->verbose) {
-            print("passthroughing packet from ", pad->name, " to ", pad->linked->name);
-        }
-
+        logger.debug("passthroughing packet from ", pad->name, " to ", pad->linked->name);
         ensure(server->websocket_context.send(pad->linked->client, payload));
         return true;
     }
@@ -188,7 +186,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session  = *(new PeerLinkerSession());
         session.server = server;
         session.client = client;
-        print("session created: ", &session);
+        server->logger.debug("session created: ", &session);
         return &session;
     }
 
@@ -196,7 +194,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session = *std::bit_cast<PeerLinkerSession*>(ptr);
         server->remove_pad(session.pad);
         delete &session;
-        print("session destroyed: ", &session);
+        server->logger.debug("session destroyed: ", &session);
     }
 
     SessionDataInitializer(PeerLinker& server)
@@ -208,7 +206,9 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 auto main(const int argc, const char* argv[]) -> int {
     using namespace p2p::plink;
 
-    auto server = PeerLinker();
+    auto  server = PeerLinker();
+    auto& logger = server.logger;
+    logger.set_name_and_detect_loglevel("plink");
     auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
     ensure(run(argc, argv, 8080, server, std::move(initor), "peer-linker"));
     return 0;

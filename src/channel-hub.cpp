@@ -1,7 +1,9 @@
 #include "channel-hub-protocol.hpp"
-#include "macros/unwrap.hpp"
 #include "server.hpp"
 #include "util/string-map.hpp"
+
+#define CUTIL_MACROS_PRINT_FUNC logger.error
+#include "macros/unwrap.hpp"
 
 namespace p2p::chub {
 namespace {
@@ -58,13 +60,15 @@ struct ChannelHub : Server {
 };
 
 auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload) -> bool {
+    auto& logger = server->logger;
+
     unwrap(header, p2p::proto::extract_header(payload));
 
     if(header.type == ::p2p::proto::Type::ActivateSession) {
         const auto cert = p2p::proto::extract_last_string<proto::Register>(payload);
-        print("received activate session");
+        logger.info("received activate session");
         ensure(activate(*server, cert), "failed to verify user certificate");
-        print("session activated");
+        logger.info("session activated");
         goto finish;
     } else {
         ensure(activated, estr[Error::NotActivated]);
@@ -73,32 +77,32 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
     switch(header.type) {
     case ::p2p::proto::Type::Success:
     case ::p2p::proto::Type::Error:
-        line_warn("unexpected packet");
+        logger.warn("unexpected packet type=", int(header.type));
         return true;
     case proto::Type::Register: {
         const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
-        print("received channel register request name:", name);
+        logger.info("received channel register request name=", name);
 
         ensure(!name.empty(), estr[Error::EmptyChannelName]);
         ensure(server->channels.find(name) == server->channels.end(), estr[Error::ChannelFound]);
 
-        print("channel ", name, " registerd");
+        logger.info("channel ", name, " registerd");
         server->channels.insert(std::pair{name, Channel{std::string(name), this}});
     } break;
     case proto::Type::Unregister: {
         const auto name = p2p::proto::extract_last_string<proto::Unregister>(payload);
-        print("received channel unregister request name: ", name);
+        logger.info("received channel unregister request name: ", name);
 
         const auto it = server->channels.find(name);
         ensure(it != server->channels.end(), estr[Error::ChannelNotFound]);
         auto& channel = it->second;
         ensure(channel.session == this, estr[Error::SenderMismatch]);
 
-        print("unregistering channel ", channel.name);
+        logger.info("unregistering channel ", channel.name);
         server->channels.erase(it);
     } break;
     case proto::Type::GetChannels: {
-        print("received channel list request");
+        logger.info("received channel list request");
         auto payload = std::vector<std::byte>();
         for(auto it = server->channels.begin(); it != server->channels.end(); it = std::next(it)) {
             const auto& name      = it->second.name;
@@ -112,7 +116,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
     } break;
     case proto::Type::PadRequest: {
         const auto name = p2p::proto::extract_last_string<proto::PadRequest>(payload);
-        print("received pad request for channel: ", name);
+        logger.info("received pad request for channel: ", name);
 
         // check if another request is pending
         for(auto i = server->pending_requests.begin(); i != server->pending_requests.end(); i = std::next(i)) {
@@ -128,7 +132,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         server->pending_requests.insert({id, PendingRequest{.requester = this, .requestee = channel.session}});
     } break;
     case proto::Type::PadRequestResponse: {
-        print("received pad request response");
+        logger.info("received pad request response");
 
         unwrap(packet, p2p::proto::extract_payload<proto::PadRequestResponse>(payload));
         const auto pad_name = p2p::proto::extract_last_string<proto::PadRequestResponse>(payload);
@@ -138,7 +142,7 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         const auto request = request_it->second;
         server->pending_requests.erase(request_it);
 
-        print("sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
+        logger.info("sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
         ensure(server->send_to(request.requester->client, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
     } break;
     default: {
@@ -158,7 +162,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session  = *(new ChannelHubSession());
         session.server = server;
         session.client = client;
-        print("session created: ", &session);
+        server->logger.debug("session created: ", &session);
         return &session;
     }
 
@@ -170,7 +174,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         for(auto i = channels.begin(); i != channels.end(); i = std::next(i)) {
             const auto& channel = i->second;
             if(channel.session == &session) {
-                print("unregistering channel ", channel.name);
+                server->logger.info("unregistering channel ", channel.name);
                 channels.erase(i);
                 break;
             }
@@ -195,7 +199,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         }
 
         delete &session;
-        print("session destroyed: ", &session);
+        server->logger.debug("session destroyed: ", &session);
     }
 
     SessionDataInitializer(ChannelHub& server)
@@ -203,7 +207,9 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 };
 
 auto run(const int argc, const char* argv[]) -> bool {
-    auto server = ChannelHub();
+    auto  server = ChannelHub();
+    auto& logger = server.logger;
+    logger.set_name_and_detect_loglevel("chub");
     auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
     ensure(run(argc, argv, 8081, server, std::move(initor), "channel-hub"));
     return true;

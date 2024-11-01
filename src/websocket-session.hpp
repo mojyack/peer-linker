@@ -48,8 +48,6 @@ class WebSocketSession {
     auto destroy() -> void;
 
   public:
-    bool verbose = false;
-
     auto start(const WebSocketSessionParams& params) -> bool;
     auto stop() -> void;
     auto set_ws_dump_packets(bool flag) -> void;

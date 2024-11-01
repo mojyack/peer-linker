@@ -39,8 +39,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
 
     const auto channel_hub = p2p::wss::ServerLocation{"localhost", 8081};
 
-    auto sender    = ChannelHubSender();
-    sender.verbose = true;
+    auto sender = ChannelHubSender();
     sender.set_ws_dump_packets(true);
     auto receiver = p2p::chub::ChannelHubReceiver();
     ensure(sender.start({channel_hub, user_cert, {}, allow_self_signed}));

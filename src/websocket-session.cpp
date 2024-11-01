@@ -1,5 +1,12 @@
 #include "websocket-session.hpp"
+#include "util/logger.hpp"
+
+#define CUTIL_MACROS_PRINT_FUNC logger.error
 #include "macros/unwrap.hpp"
+
+namespace {
+auto logger = Logger("p2p_ws");
+}
 
 namespace p2p::wss {
 auto WebSocketSession::on_packet_received(const std::span<const std::byte> payload) -> bool {
@@ -19,11 +26,11 @@ auto WebSocketSession::on_packet_received(const std::span<const std::byte> paylo
 
 auto WebSocketSession::handle_raw_packet(std::span<const std::byte> payload) -> void {
     if(!on_packet_received(payload)) {
-        line_warn("payload handling failed");
+        logger.error("payload handling failed");
 
         const auto& header_o = p2p::proto::extract_header(payload);
         if(!header_o) {
-            line_warn("packet too short");
+            logger.error("packet too short");
             send_result(::p2p::proto::Type::Error, 0);
         } else {
             send_result(::p2p::proto::Type::Error, header_o->id);
@@ -51,7 +58,7 @@ auto WebSocketSession::send_packet_detached(const EventCallback callback, const 
 }
 
 auto WebSocketSession::on_disconnected() -> void {
-    line_print("session disconnected");
+    logger.info("session disconnected");
 }
 
 auto WebSocketSession::is_connected() const -> bool {
@@ -67,9 +74,7 @@ auto WebSocketSession::destroy() -> void {
 
 auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
-        if(verbose) {
-            line_print("received ", payload.size(), " bytes");
-        }
+        logger.debug("received ", payload.size(), " bytes");
         handle_raw_packet(payload);
     };
     ensure(websocket_context.init({

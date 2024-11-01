@@ -1,13 +1,14 @@
 #pragma once
 #include "protocol-helper.hpp"
 #include "session-key.hpp"
+#include "util/logger.hpp"
 #include "ws/server.hpp"
 
 struct Server {
     ws::server::Context       websocket_context;
     std::optional<SessionKey> session_key;
     std::string               user_cert_verifier;
-    bool                      verbose = false;
+    Logger                    logger;
 
     template <class... Args>
     auto send_to(ws::server::Client* const client, const uint16_t type, const uint32_t id, Args... args) -> bool {
