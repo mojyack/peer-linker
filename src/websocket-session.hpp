@@ -3,6 +3,7 @@
 
 #include "event-manager.hpp"
 #include "protocol-helper.hpp"
+#include "server-location.hpp"
 #include "ws/client.hpp"
 
 namespace p2p::wss {
@@ -12,11 +13,6 @@ struct EventKind {
 
         Limit,
     };
-};
-
-struct ServerLocation {
-    std::string address;
-    uint16_t    port;
 };
 
 struct WebSocketSessionParams {

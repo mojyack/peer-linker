@@ -5,7 +5,7 @@
 
 namespace p2p::chub {
 struct ChannelHubSessionParams {
-    wss::ServerLocation channel_hub;
+    ServerLocation      channel_hub;
     std::string_view    user_certificate              = {};
     ws::KeepAliveParams keepalive                     = {};
     bool                channel_hub_allow_self_signed = false;

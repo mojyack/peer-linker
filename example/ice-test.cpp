@@ -37,8 +37,8 @@ class ClientSession : public p2p::ice::IceSession {
 auto main(const bool controlling) -> bool {
     auto session = ClientSession();
     session.set_ws_dump_packets(true);
-    const auto peer_linker = p2p::wss::ServerLocation{server_domain, server_port};
-    const auto stun_server = p2p::wss::ServerLocation{"stun.l.google.com", 19302};
+    const auto peer_linker = p2p::ServerLocation{server_domain, server_port};
+    const auto stun_server = p2p::ServerLocation{"stun.l.google.com", 19302};
     ensure(session.start({
                              .stun_server = stun_server,
                          },

@@ -37,7 +37,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
         user_cert = from_span(cert);
     }
 
-    const auto channel_hub = p2p::wss::ServerLocation{"localhost", 8081};
+    const auto channel_hub = p2p::ServerLocation{"localhost", 8081};
 
     auto sender = ChannelHubSender();
     sender.set_ws_dump_packets(true);
