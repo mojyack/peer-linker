@@ -1,8 +1,8 @@
 #include "ice-session.hpp"
 #include "ice-session-protocol.hpp"
-#include "util/logger.hpp"
+#include "macros/logger.hpp"
 
-#define CUTIL_MACROS_PRINT_FUNC logger.error
+#define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
 #include "macros/unwrap.hpp"
 
 namespace {
@@ -12,7 +12,7 @@ auto logger = Logger("p2p_ice");
 namespace p2p::ice {
 namespace {
 auto on_state_changed(juice_agent_t* const /*agent*/, const juice_state_t state, void* const user_ptr) -> void {
-    logger.debug("state changed to ", juice_state_to_string(state));
+    LOG_DEBUG(logger, "state changed to ", juice_state_to_string(state));
 
     auto& session = *std::bit_cast<IceSession*>(user_ptr);
     switch(state) {
@@ -46,7 +46,7 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
     switch(header.type) {
     case proto::Type::SessionDescription: {
         const auto desc = p2p::proto::extract_last_string<proto::SessionDescription>(payload);
-        logger.debug("received session description: ", desc);
+        LOG_DEBUG(logger, "received session description: ", desc);
         remote_desc = desc;
         events.invoke(EventKind::SessionDescSet, no_id, no_value);
 
@@ -55,14 +55,14 @@ auto IceSession::on_packet_received(const std::span<const std::byte> payload) ->
     }
     case proto::Type::Candidate: {
         const auto desc = p2p::proto::extract_last_string<proto::Candidate>(payload);
-        logger.debug("received candidates: ", desc);
+        LOG_DEBUG(logger, "received candidates: ", desc);
         juice_add_remote_candidate(agent.get(), desc.data());
 
         send_result(::p2p::proto::Type::Success, header.id);
         return true;
     }
     case proto::Type::GatheringDone: {
-        logger.debug("remote gathering done");
+        LOG_DEBUG(logger, "remote gathering done");
         juice_set_remote_gathering_done(agent.get());
         // events.invoke(EventKind::RemoteGatheringDone, no_id, no_value);
 
@@ -83,19 +83,19 @@ auto IceSession::on_p2p_connected_state(const bool flag) -> void {
 }
 
 auto IceSession::on_p2p_new_candidate(const std::string_view desc) -> void {
-    logger.debug("new candidates: ", desc);
+    LOG_DEBUG(logger, "new candidates: ", desc);
     send_packet_detached(
         proto::Type::Candidate, [](uint32_t result) { ensure_v(result, "failed to send new candidate"); }, desc);
 }
 
 auto IceSession::on_p2p_gathering_done() -> void {
-    logger.debug("gathering done");
+    LOG_DEBUG(logger, "gathering done");
     send_packet_detached(
         proto::Type::GatheringDone, [](uint32_t result) { ensure_v(result, "failed to send gathering done signal"); });
 }
 
 auto IceSession::on_p2p_packet_received(const std::span<const std::byte> payload) -> void {
-    logger.debug("p2p data received size=", payload.size());
+    LOG_DEBUG(logger, "p2p data received size=", payload.size());
 }
 
 auto IceSession::start(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool {
@@ -133,7 +133,7 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
 
     auto desc = std::array<char, JUICE_MAX_SDP_STRING_LEN>();
     ensure(juice_get_local_description(agent.get(), desc.data(), desc.size()) == JUICE_ERR_SUCCESS);
-    logger.debug("local session description: ", desc.data());
+    LOG_DEBUG(logger, "local session description: ", desc.data());
     ensure(send_packet(proto::Type::SessionDescription, std::string_view(desc.data())));
     if(!controlled) {
         ensure(events.wait_for(EventKind::SessionDescSet));

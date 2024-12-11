@@ -2,10 +2,10 @@
 #include <utility>
 
 #include "event-manager.hpp"
+#include "macros/logger.hpp"
 #include "util/event.hpp"
-#include "util/logger.hpp"
 
-#define CUTIL_MACROS_PRINT_FUNC logger.error
+#define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
 #include "macros/assert.hpp"
 
 namespace {
@@ -18,7 +18,7 @@ auto Events::eh_match(const uint32_t kind, const uint32_t id) -> auto {
 }
 
 auto Events::register_callback(const uint32_t kind, const uint32_t id, const EventCallback callback) -> bool {
-    logger.debug("new event handler registered kind: ", kind, " id: ", id);
+    LOG_DEBUG(logger, "new event handler registered kind: ", kind, " id: ", id);
 
     auto value = std::optional<uint32_t>();
     {
@@ -63,9 +63,9 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id, const bool report_
 
 auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
     if(id != no_id) {
-        logger.debug("new event kind: ", kind, " id: ", id, " value: ", value);
+        LOG_DEBUG(logger, "new event kind: ", kind, " id: ", id, " value: ", value);
     } else {
-        logger.debug("new event kind: ", kind, " value: ", value);
+        LOG_DEBUG(logger, "new event kind: ", kind, " value: ", value);
     }
 
     auto found = std::optional<Handler>();
@@ -85,7 +85,7 @@ auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> v
 }
 
 auto Events::drain() -> bool {
-    logger.debug("draining...");
+    LOG_DEBUG(logger, "draining...");
 
     {
         auto guard = std::lock_guard(lock);

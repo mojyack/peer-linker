@@ -92,7 +92,7 @@ auto ChannelHubReceiver::on_packet_received(const std::span<const std::byte> pay
         const auto channels = ::p2p::proto::extract_last_string<proto::GetChannelsResponse>(payload);
         // TODO: use packet id
         if(!std::exchange(channels_buffer, channels).empty()) {
-            line_warn("previous get channels response not handled");
+            WARN("previous get channels response not handled");
         }
         events.invoke(EventKind::Channels, header.id, no_value);
         return true;

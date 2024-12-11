@@ -3,13 +3,14 @@
 #include <optional>
 #include <string_view>
 
+#include "macros/logger.hpp"
 #include "protocol-helper.hpp"
 #include "server.hpp"
 #include "util/argument-parser.hpp"
 #include "util/file-io.hpp"
 #include "ws/misc.hpp"
 
-#define CUTIL_MACROS_PRINT_FUNC logger.error
+#define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
 #include "macros/unwrap.hpp"
 
 #if defined(_WIN32)
@@ -95,13 +96,13 @@ auto run(const int argc, const char* const* const argv,
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server, &logger](ws::server::Client* client, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::client_to_userdata(client));
-        server.logger.debug("session ", &session, ": ", "received ", payload.size(), " bytes");
+        LOG_DEBUG(server.logger, "session ", &session, ": ", "received ", payload.size(), " bytes");
         if(!session.handle_payload(payload)) {
-            server.logger.error("payload handling failed");
+            LOG_ERROR(server.logger, "payload handling failed");
 
             const auto& header_o = p2p::proto::extract_header(payload);
             if(!header_o) {
-                server.logger.error("packet too short");
+                LOG_ERROR(server.logger, "packet too short");
                 ensure_v(server.send_to(client, p2p::proto::Type::Error, 0));
             } else {
                 ensure_v(server.send_to(client, p2p::proto::Type::Error, header_o->id));
