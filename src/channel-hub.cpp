@@ -172,12 +172,13 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
 
         // remove corresponding channels
         auto& channels = server->channels;
-        for(auto i = channels.begin(); i != channels.end(); i = std::next(i)) {
+        for(auto i = channels.begin(); i != channels.end();) {
             const auto& channel = i->second;
             if(channel.session == &session) {
                 LOG_INFO(server->logger, "unregistering channel ", channel.name);
-                channels.erase(i);
-                break;
+                i = channels.erase(i);
+            } else {
+                i = std::next(i);
             }
         }
 
