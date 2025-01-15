@@ -16,6 +16,13 @@ struct EventKind {
     };
 };
 
+enum class SendResult {
+    Success,
+    WouldBlock,
+    MessageTooLarge,
+    UnknownError,
+};
+
 struct IceSessionParams {
     ServerLocation                   stun_server;
     std::vector<juice_turn_server_t> turn_servers;
@@ -40,7 +47,7 @@ class IceSession : public plink::PeerLinkerSession {
 
     auto start(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool;
     auto start_ice(const IceSessionParams& params, const plink::PeerLinkerSessionParams& plink_params) -> bool;
-    auto send_packet_p2p(const std::span<const std::byte> payload) -> bool;
+    auto send_packet_p2p(const std::span<const std::byte> payload) -> SendResult;
 
     virtual ~IceSession() {}
 };

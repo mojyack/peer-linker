@@ -147,7 +147,16 @@ auto IceSession::start_ice(const IceSessionParams& params, const plink::PeerLink
     return true;
 }
 
-auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> bool {
-    return juice_send(agent.get(), (const char*)payload.data(), payload.size()) == 0;
+auto IceSession::send_packet_p2p(const std::span<const std::byte> payload) -> SendResult {
+    switch(juice_send(agent.get(), (const char*)payload.data(), payload.size())) {
+    case JUICE_ERR_SUCCESS:
+        return SendResult::Success;
+    case JUICE_ERR_AGAIN:
+        return SendResult::WouldBlock;
+    case JUICE_ERR_TOO_LARGE:
+        return SendResult::MessageTooLarge;
+    default:
+        return SendResult::UnknownError;
+    }
 }
 } // namespace p2p::ice
