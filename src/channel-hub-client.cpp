@@ -117,7 +117,7 @@ auto ChannelHubReceiver::get_channels() -> std::optional<std::vector<std::string
     auto       channels     = std::vector<std::string>();
 
     // split string array
-    auto head = size_t(0);
+    auto head = 0uz;
     auto tail = channels_str.find('\0');
     while(tail != channels_str.npos) {
         channels.emplace_back(channels_str.substr(head, tail - head));
