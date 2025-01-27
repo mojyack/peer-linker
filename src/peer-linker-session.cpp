@@ -35,7 +35,7 @@ auto PeerLinkerSession::on_packet_received(const std::span<const std::byte> payl
         const auto secret         = std::span(payload.data() + sizeof(proto::Link) + packet.requester_name_len, packet.secret_len);
 
         const auto ok = auth_peer(requester_name, secret);
-        LOG_DEBUG(logger, "received link request name=", requester_name, " ok=", ok);
+        LOG_DEBUG(logger, "received link request name={} ok={}", requester_name, ok);
         send_packet_detached(
             proto::Type::LinkAuthResponse, [this](const uint32_t result) {
                 events.invoke(EventKind::Linked, no_id, result);

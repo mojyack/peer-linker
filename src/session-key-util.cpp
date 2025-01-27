@@ -10,7 +10,7 @@ auto generate_cert(const char* const secret_file, const char* const content_file
     unwrap(content, read_file(content_file));
     auto key = SessionKey(secret);
     unwrap(cert, key.generate_user_certificate(from_span(content)));
-    printf("%s", cert.data());
+    std::print("{}", cert.data());
     return true;
 }
 
@@ -35,14 +35,14 @@ auto main(const int argc, const char* const* const argv) -> int {
     parser.arg(&secret, "SECRET_FILE", "path to key file");
     parser.arg(&file, "TARGET_FILE", "path to data or cert file");
     if(!parser.parse(argc, argv) || help) {
-        print("usage: session-key-util ", parser.get_help());
+        std::println("usage: session-key-util {}", parser.get_help());
         return 1;
     }
 
     if(!verify) {
         return generate_cert(secret, file) ? 0 : 1;
     } else {
-        print(verify_cert(secret, file) ? "ok" : "fail");
+        std::println("{}", verify_cert(secret, file) ? "ok" : "fail");
         return 0;
     }
 }

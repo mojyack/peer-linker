@@ -31,7 +31,7 @@ auto Session::activate(Server& server, const std::string_view cert) -> bool {
             auto args = std::vector<const char*>{server.user_cert_verifier.data(), cont.data(), nullptr};
 
             auto process      = process::Process();
-            auto on_output    = [](const std::span<const char> output) { std::cout << "verifier: " << std::string_view(output.data(), output.size()); };
+            auto on_output    = [](const std::span<const char> output) { std::print("verifier: {}", std::string_view(output.data(), output.size())); };
             process.on_stdout = on_output;
             process.on_stderr = on_output;
             ensure(process.start({.argv = args, .die_on_parent_exit = true}), "failed to launch verifier");
@@ -40,7 +40,7 @@ auto Session::activate(Server& server, const std::string_view cert) -> bool {
             }
             unwrap(result, process.join());
             ensure(result.reason == process::Result::ExitReason::Exit, "verifier exitted abnormally");
-            ensure(result.code == 0, "verifier returned non-zero code: ", result.code);
+            ensure(result.code == 0, "verifier returned non-zero code {}", result.code);
         }
     }
     activated = true;
@@ -72,7 +72,7 @@ auto ServerArgs::parse(const int argc, const char* const* const argv, std::strin
     parser.kwflag(&args.websocket_dump_packets, {"-wd"}, "dump every websocket packets");
     parser.kwarg(&args.libws_debug_bitmap, {"-wb"}, "BITMAP", "libwebsockets debug flag bitmap", {.state = args::State::DefaultValue});
     if(!parser.parse(argc, argv) || args.help) {
-        print("usage: ", program_name, " ", parser.get_help());
+        std::println("usage: {} {}", program_name, parser.get_help());
         std::exit(0);
     }
     return args;
@@ -96,7 +96,7 @@ auto run(const int argc, const char* const* const argv,
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server, &logger](ws::server::Client* client, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::client_to_userdata(client));
-        LOG_DEBUG(server.logger, "session ", &session, ": ", "received ", payload.size(), " bytes");
+        LOG_DEBUG(server.logger, "session {} received {} bytes", (void*)&session, payload.size());
         if(!session.handle_payload(payload)) {
             LOG_ERROR(server.logger, "payload handling failed");
 
@@ -118,7 +118,7 @@ auto run(const int argc, const char* const* const argv,
         .private_key = args.ssl_key_file,
         .port        = args.port,
     }));
-    print("ready");
+    std::println("ready");
     while(wsctx.state == ws::server::State::Connected) {
         wsctx.process();
     }

@@ -72,34 +72,34 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         LOG_INFO(logger, "session activated");
         goto finish;
     } else {
-        ensure(activated, estr[Error::NotActivated]);
+        ensure(activated, "{}", estr[Error::NotActivated]);
     }
 
     switch(header.type) {
     case ::p2p::proto::Type::Success:
     case ::p2p::proto::Type::Error:
-        LOG_WARN(logger, "unexpected packet type=", int(header.type));
+        LOG_WARN(logger, "unexpected packet type={}", int(header.type));
         return true;
     case proto::Type::Register: {
         const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
-        LOG_INFO(logger, "received channel register request name=", name);
+        LOG_INFO(logger, "received channel register request name={}", name);
 
-        ensure(!name.empty(), estr[Error::EmptyChannelName]);
-        ensure(server->channels.find(name) == server->channels.end(), estr[Error::ChannelFound]);
+        ensure(!name.empty(), "{}", estr[Error::EmptyChannelName]);
+        ensure(server->channels.find(name) == server->channels.end(), "{}", estr[Error::ChannelFound]);
 
-        LOG_INFO(logger, "channel ", name, " registerd");
+        LOG_INFO(logger, "channel {} registerd", name);
         server->channels.insert(std::pair{name, Channel{std::string(name), this}});
     } break;
     case proto::Type::Unregister: {
         const auto name = p2p::proto::extract_last_string<proto::Unregister>(payload);
-        LOG_INFO(logger, "received channel unregister request name: ", name);
+        LOG_INFO(logger, "received channel unregister request name={}", name);
 
         const auto it = server->channels.find(name);
-        ensure(it != server->channels.end(), estr[Error::ChannelNotFound]);
+        ensure(it != server->channels.end(), "{}", estr[Error::ChannelNotFound]);
         auto& channel = it->second;
-        ensure(channel.session == this, estr[Error::SenderMismatch]);
+        ensure(channel.session == this, "{}", estr[Error::SenderMismatch]);
 
-        LOG_INFO(logger, "unregistering channel ", channel.name);
+        LOG_INFO(logger, "unregistering channel {}", channel.name);
         server->channels.erase(it);
     } break;
     case proto::Type::GetChannels: {
@@ -117,15 +117,15 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
     } break;
     case proto::Type::PadRequest: {
         const auto name = p2p::proto::extract_last_string<proto::PadRequest>(payload);
-        LOG_INFO(logger, "received pad request for channel: ", name);
+        LOG_INFO(logger, "received pad request for channel={}", name);
 
         // check if another request is pending
         for(auto i = server->pending_requests.begin(); i != server->pending_requests.end(); i = std::next(i)) {
-            ensure(i->second.requester != this, estr[Error::AnotherRequestPending]);
+            ensure(i->second.requester != this, "{}", estr[Error::AnotherRequestPending]);
         }
 
         const auto it = server->channels.find(name);
-        ensure(it != server->channels.end(), estr[Error::ChannelNotFound]);
+        ensure(it != server->channels.end(), "{}", estr[Error::ChannelNotFound]);
         auto& channel = it->second;
 
         const auto id = server->packet_id += 1;
@@ -139,15 +139,15 @@ auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload)
         const auto pad_name = p2p::proto::extract_last_string<proto::PadRequestResponse>(payload);
 
         const auto request_it = server->pending_requests.find(header.id);
-        ensure(request_it != server->pending_requests.end(), estr[Error::RequesterNotFound]);
+        ensure(request_it != server->pending_requests.end(), "{}", estr[Error::RequesterNotFound]);
         const auto request = request_it->second;
         server->pending_requests.erase(request_it);
 
-        LOG_INFO(logger, "sending pad name ok: ", packet.ok, " pad_name: ", pad_name);
+        LOG_INFO(logger, "sending pad name ok={} pad_name={}", packet.ok, pad_name);
         ensure(server->send_to(request.requester->client, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
     } break;
     default: {
-        bail("unknown command ", int(header.type));
+        bail("unknown command {}", int(header.type));
     }
     }
 
@@ -163,7 +163,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session  = *(new ChannelHubSession());
         session.server = server;
         session.client = client;
-        LOG_DEBUG(server->logger, "session created: ", &session);
+        LOG_DEBUG(server->logger, "session created {}", (void*)&session);
         return &session;
     }
 
@@ -175,7 +175,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         for(auto i = channels.begin(); i != channels.end();) {
             const auto& channel = i->second;
             if(channel.session == &session) {
-                LOG_INFO(server->logger, "unregistering channel ", channel.name);
+                LOG_INFO(server->logger, "unregistering channel {}", channel.name);
                 i = channels.erase(i);
             } else {
                 i = std::next(i);
@@ -201,7 +201,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         }
 
         delete &session;
-        LOG_DEBUG(server->logger, "session destroyed: ", &session);
+        LOG_DEBUG(server->logger, "session destroyed {}", (void*)&session);
     }
 
     SessionDataInitializer(ChannelHub& server)

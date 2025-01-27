@@ -18,7 +18,7 @@ auto SessionKey::split_user_certificate_to_hash_and_content(const std::string_vi
 auto SessionKey::generate_user_certificate(const std::string_view content) -> std::optional<std::string> {
     unwrap(hash, crypto::hmac::compute_hmac_sha256(secret, to_span(content)));
     const auto hash_str = crypto::base64::encode(hash);
-    return build_string(hash_str, "\n", content);
+    return std::format("{}\n{}", hash_str, content);
 }
 
 auto SessionKey::verify_user_certificate_hash(const std::string_view hash_str, const std::string_view content) -> bool {

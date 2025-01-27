@@ -18,7 +18,7 @@ auto Events::eh_match(const uint32_t kind, const uint32_t id) -> auto {
 }
 
 auto Events::register_callback(const uint32_t kind, const uint32_t id, const EventCallback callback) -> bool {
-    LOG_DEBUG(logger, "new event handler registered kind: ", kind, " id: ", id);
+    LOG_DEBUG(logger, "new event handler registered kind={} id={}", kind, id);
 
     auto value = std::optional<uint32_t>();
     {
@@ -63,9 +63,9 @@ auto Events::wait_for(const uint32_t kind, const uint32_t id, const bool report_
 
 auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> void {
     if(id != no_id) {
-        LOG_DEBUG(logger, "new event kind: ", kind, " id: ", id, " value: ", value);
+        LOG_DEBUG(logger, "new event kind={} id={} value={}", kind, id, value);
     } else {
-        LOG_DEBUG(logger, "new event kind: ", kind, " value: ", value);
+        LOG_DEBUG(logger, "new event kind={} value={}", kind, value);
     }
 
     auto found = std::optional<Handler>();
@@ -76,7 +76,7 @@ auto Events::invoke(uint32_t kind, const uint32_t id, const uint32_t value) -> v
             handlers.erase(i);
         }
         if(!found) {
-            ensure(notified.size() < 32, "event queue is full, dropping notified event kind=", kind, " id=", id, " value=", value);
+            ensure(notified.size() < 32, "event queue is full, dropping notified event kind={} id={} value={}", kind, id, value);
             notified.emplace_back(Handler{.kind = kind, .id = id, .value = value});
             return;
         }

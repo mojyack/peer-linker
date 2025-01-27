@@ -20,7 +20,7 @@ auto WebSocketSession::on_packet_received(const std::span<const std::byte> paylo
         events.invoke(wss::EventKind::Result, header.id, 0);
         return true;
     default:
-        bail("unhandled payload type ", int(header.type));
+        bail("unhandled payload type {}", int(header.type));
     }
 }
 
@@ -74,7 +74,7 @@ auto WebSocketSession::destroy() -> void {
 
 auto WebSocketSession::start(const WebSocketSessionParams& params) -> bool {
     websocket_context.handler = [this](std::span<const std::byte> payload) -> void {
-        LOG_DEBUG(logger, "received ", payload.size(), " bytes");
+        LOG_DEBUG(logger, "received {} bytes", payload.size());
         handle_raw_packet(payload);
     };
     ensure(websocket_context.init({

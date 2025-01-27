@@ -25,12 +25,12 @@ class ClientSession : public p2p::ice::IceSession {
 
     auto auth_peer(std::string_view peer_name, std::span<const std::byte> secret) -> bool override {
         auto s = from_span(secret);
-        print("secret=", s, " ", s.size(), s == "password");
+        std::println("secret={} size={} ok={}", s, s.size(), s == "password");
         return peer_name == "agent a" && from_span(secret) == "password";
     }
 
     auto on_p2p_packet_received(const std::span<const std::byte> payload) -> void override {
-        print("received p2p message: ", from_span(payload));
+        std::println("received p2p message: {}", from_span(payload));
     }
 };
 
@@ -68,7 +68,7 @@ auto run(const int argc, const char* const* const argv) -> bool {
     parser.kwarg(&message_count, {"-c"}, "COUNT", "number of messages to send", {.state = args::State::DefaultValue});
     parser.kwarg(&role, {"-r", "--role"}, "ROLE(both|server|client)", "test target", {.state = args::State::DefaultValue});
     if(!parser.parse(argc, argv) || help) {
-        print("usage: peer-linker-test ", parser.get_help());
+        std::println("usage: peer-linker-test {}", parser.get_help());
         return true;
     }
 
