@@ -163,7 +163,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session  = *(new ChannelHubSession());
         session.server = server;
         session.client = client;
-        LOG_DEBUG(server->logger, "session created {}", (void*)&session);
+        LOG_DEBUG(server->logger, "session created {}", &session);
         return &session;
     }
 
@@ -201,7 +201,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         }
 
         delete &session;
-        LOG_DEBUG(server->logger, "session destroyed {}", (void*)&session);
+        LOG_DEBUG(server->logger, "session destroyed {}", &session);
     }
 
     SessionDataInitializer(ChannelHub& server)

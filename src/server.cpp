@@ -96,7 +96,7 @@ auto run(const int argc, const char* const* const argv,
     auto& wsctx   = server.websocket_context;
     wsctx.handler = [&server, &logger](ws::server::Client* client, std::span<const std::byte> payload) -> void {
         auto& session = *std::bit_cast<Session*>(ws::server::client_to_userdata(client));
-        LOG_DEBUG(server.logger, "session {} received {} bytes", (void*)&session, payload.size());
+        LOG_DEBUG(server.logger, "session {} received {} bytes", &session, payload.size());
         if(!session.handle_payload(payload)) {
             LOG_ERROR(server.logger, "payload handling failed");
 

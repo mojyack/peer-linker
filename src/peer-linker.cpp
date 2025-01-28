@@ -187,7 +187,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session  = *(new PeerLinkerSession());
         session.server = server;
         session.client = client;
-        LOG_DEBUG(server->logger, "session created {}", (void*)&session);
+        LOG_DEBUG(server->logger, "session created {}", &session);
         return &session;
     }
 
@@ -195,7 +195,7 @@ struct SessionDataInitializer : ws::server::SessionDataInitializer {
         auto& session = *std::bit_cast<PeerLinkerSession*>(ptr);
         server->remove_pad(session.pad);
         delete &session;
-        LOG_DEBUG(server->logger, "session destroyed {}", (void*)&session);
+        LOG_DEBUG(server->logger, "session destroyed {}", &session);
     }
 
     SessionDataInitializer(PeerLinker& server)
