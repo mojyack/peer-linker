@@ -1,43 +1,57 @@
 #pragma once
-#include "protocol.hpp"
+#include "net/common.hpp"
 
-namespace p2p::chub::proto {
-struct Type {
-    enum : uint16_t {
-        Register = ::p2p::proto::Type::Limit, // server <-  sender => (Success|Error)  register channel
-        Unregister,                           // server <-  sender => (Success|Error)  unregister channel
-        GetChannels,                          // server <-  receiver => (GetChannelsResponse|Error)  query registered channels
-        GetChannelsResponse,                  // server ->  receiver => ()  registered channels
-        PadRequest,                           // server <-  receiver => (Success|Error)  ask server to send pad request to a channel
-                                              // server  -> sender => (PadRequestResponse) request new pad
-        PadRequestResponse,                   // server <-  sender => (Success|Error)  ask server to notify receiver creation of pad
-                                              // server  -> receiver => () registered pad name
+namespace plink::proto {
+// server <- sender   => (Result) register channel
+struct RegisterChannel {
+    constexpr static auto pt = net::PacketType(0x03);
 
-        Limit,
-    };
+    SerdeFieldsBegin;
+    std::string SerdeField(name);
+    SerdeFieldsEnd;
 };
 
-struct Register : ::p2p::proto::Packet {
-    // char channel_name[];
+// server <- sender   => (Result) unregister channel
+struct UnregisterChannel {
+    constexpr static auto pt = net::PacketType(0x04);
+
+    SerdeFieldsBegin;
+    std::string SerdeField(name);
+    SerdeFieldsEnd;
 };
 
-struct Unregister : ::p2p::proto::Packet {
-    // char channel_name[];
+// server <- receiver => (Channels) query registered channels
+struct GetChannels {
+    constexpr static auto pt = net::PacketType(0x05);
 };
 
-struct GetChannels : ::p2p::proto::Packet {
+// server -> receiver => () registered channels
+struct Channels {
+    constexpr static auto pt = net::PacketType(0x06);
+
+    SerdeFieldsBegin;
+    std::vector<std::string> SerdeField(channels);
+    SerdeFieldsEnd;
 };
 
-struct GetChannelsResponse : ::p2p::proto::Packet {
-    // char channels[]; // null-terminated string list
+// server <- receiver => (PadCreated) ask server to send pad request to a channel
+// server -> sender   => (PadCreated) request new pad
+struct RequestPad {
+    constexpr static auto pt = net::PacketType(0x07);
+
+    SerdeFieldsBegin;
+    std::string SerdeField(channel_name);
+    SerdeFieldsEnd;
 };
 
-struct PadRequest : ::p2p::proto::Packet {
-    // char channel_name[];
-};
+// server <- sender   => (Result) ask server to notify receiver creation of pad
+// server -> receiver => () registered pad name
+struct PadCreated {
+    constexpr static auto pt = net::PacketType(0x08);
 
-struct PadRequestResponse : ::p2p::proto::Packet {
-    uint16_t ok;
-    // char pad_name[];
+    SerdeFieldsBegin;
+    std::string SerdeField(channel_name);
+    std::string SerdeField(pad_name); // empty name indicates error
+    SerdeFieldsEnd;
 };
-} // namespace p2p::chub::proto
+} // namespace plink::proto

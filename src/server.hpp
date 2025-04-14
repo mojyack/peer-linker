@@ -1,33 +1,35 @@
 #pragma once
-#include "protocol-helper.hpp"
+#include <coop/mutex.hpp>
+
+#include "net/backend.hpp"
+#include "net/packet-parser.hpp"
 #include "session-key.hpp"
-#include "util/logger.hpp"
-#include "ws/server.hpp"
+#include "util/logger-pre.hpp"
 
-struct Server {
-    ws::server::Context       websocket_context;
-    std::optional<SessionKey> session_key;
-    std::string               user_cert_verifier;
-    Logger                    logger;
-
-    template <class... Args>
-    auto send_to(ws::server::Client* const client, const uint16_t type, const uint32_t id, Args... args) -> bool {
-        return websocket_context.send(client, p2p::proto::build_packet(type, id, args...));
-    }
-};
+namespace plink {
+struct Server;
 
 struct Session {
-    bool activated = false;
+    net::PacketParser parser;
+    bool              activated = false;
 
-    virtual auto handle_payload(std::span<const std::byte> payload) -> bool = 0;
-
-    auto activate(Server& server, std::string_view cert) -> bool;
+    auto         handle_activation(net::BytesRef payload, Server& server) -> bool;
+    virtual auto handle_payload(net::Header header, net::BytesRef payload) -> coop::Async<bool> = 0;
 
     virtual ~Session() {}
 };
 
-auto run(int argc, const char* const* argv,
-         uint16_t                                            default_port,
-         Server&                                             server,
-         std::unique_ptr<ws::server::SessionDataInitializer> session_initer,
-         const char*                                         protocol) -> bool;
+struct Server {
+    std::unique_ptr<net::ServerBackend> backend;
+    std::optional<SessionKey>           session_key;
+    std::string                         user_cert_verifier;
+    coop::Mutex                         mutex;
+    Logger                              logger;
+
+    virtual auto alloc_session() -> coop::Async<Session*>        = 0;
+    virtual auto free_session(Session* ptr) -> coop::Async<void> = 0;
+    virtual ~Server() {};
+};
+
+auto run(int argc, const char* const* argv, uint16_t port, Server& server, std::string_view name) -> bool;
+} // namespace plink

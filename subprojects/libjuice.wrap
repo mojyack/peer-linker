@@ -1,9 +1,0 @@
-[wrap-git]
-url = https://github.com/paullouisageneau/libjuice.git
-revision = 2fb91a3c90b9e5bde2f3cb0ecb4f53b9af027eca
-depth = 1
-method = cmake
-
-[provide]
-libjuice = juice_dep
-

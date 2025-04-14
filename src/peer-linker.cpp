@@ -1,20 +1,14 @@
 #include "macros/logger.hpp"
 #include "peer-linker-protocol.hpp"
+#include "protocol.hpp"
 #include "server.hpp"
 #include "util/string-map.hpp"
 
 #define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
-#include "macros/unwrap.hpp"
+#include "macros/coop-unwrap.hpp"
 
-namespace p2p::plink {
+namespace plink {
 namespace {
-struct Pad {
-    std::string         name;
-    std::string         authenticator_name;
-    ws::server::Client* client = nullptr;
-    Pad*                linked = nullptr;
-};
-
 struct Error {
     enum {
         NotActivated = 0,
@@ -27,7 +21,7 @@ struct Error {
         NotLinked,
         AuthInProgress,
         AuthNotInProgress,
-        AutherMismatched,
+        AuthorMismatched,
 
         Limit,
     };
@@ -44,173 +38,171 @@ const auto estr = std::array{
     "pad not linked",                        // NotLinked
     "another authentication in progress",    // AuthInProgress
     "pad not authenticating",                // AuthNotInProgress
-    "authenticator mismatched",              // AutherMismatched
+    "authenticator mismatched",              // AuthorMismatched
 };
 
 static_assert(Error::Limit == estr.size());
 
+struct LinkRequestState {
+    std::string   authenticator_name;
+    net::PacketID packet_id;
+};
+
+struct Pad {
+    std::string                     name;
+    Session*                        session = nullptr;
+    Pad*                            linked  = nullptr;
+    std::optional<LinkRequestState> pending_link_request;
+};
+
 struct PeerLinker : Server {
     StringMap<Pad> pads;
 
-    auto remove_pad(Pad* pad) -> void {
-        if(pad == nullptr) {
-            return;
-        }
-        if(pad->linked) {
-            send_to(pad->linked->client, proto::Type::Unlinked, 0);
-            pad->linked->linked = nullptr;
-        }
-        pads.erase(pad->name);
-    }
+    auto remove_pad(Pad* pad) -> coop::Async<void>;
+    auto alloc_session() -> coop::Async<Session*> override;
+    auto free_session(Session* ptr) -> coop::Async<void> override;
 };
 
 struct PeerLinkerSession : Session {
-    PeerLinker*         server;
-    ws::server::Client* client;
-    Pad*                pad = nullptr;
+    PeerLinker* server;
+    Pad*        pad = nullptr;
 
-    auto handle_payload(std::span<const std::byte> payload) -> bool override;
+    auto handle_payload(net::Header header, net::BytesRef payload) -> coop::Async<bool> override;
 };
 
-auto PeerLinkerSession::handle_payload(const std::span<const std::byte> payload) -> bool {
+auto PeerLinkerSession::handle_payload(const net::Header header, const net::BytesRef payload) -> coop::Async<bool> {
     auto& logger = server->logger;
 
-    unwrap(header, p2p::proto::extract_header(payload));
-
-    if(header.type == ::p2p::proto::Type::ActivateSession) {
-        const auto cert = p2p::proto::extract_last_string<proto::Register>(payload);
-        LOG_INFO(logger, "received activate session");
-        ensure(activate(*server, cert), "failed to verify user certificate");
-        LOG_INFO(logger, "session activated");
+    if(header.type == proto::ActivateSession::pt) {
+        coop_ensure(handle_activation(payload, *server));
         goto finish;
     } else {
-        ensure(activated, "{}", estr[Error::NotActivated]);
+        coop_ensure(activated, "{}", estr[Error::NotActivated]);
     }
 
     switch(header.type) {
-    case proto::Type::Register: {
-        const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
-        LOG_INFO(logger, "received pad register request name={}", name);
+    case proto::RegisterPad::pt: {
+        coop_unwrap(request, (serde::load<net::BinaryFormat, proto::RegisterPad>(payload)));
+        LOG_INFO(logger, "received pad register request name={}", request.name);
 
-        ensure(!name.empty(), "{}", estr[Error::EmptyPadName]);
-        ensure(pad == nullptr, "{}", estr[Error::AlreadyRegistered]);
-        ensure(server->pads.find(name) == server->pads.end(), "{}", estr[Error::PadFound]);
+        coop_ensure(!request.name.empty(), "{}", estr[Error::EmptyPadName]);
+        coop_ensure(pad == nullptr, "{}", estr[Error::AlreadyRegistered]);
+        coop_ensure(server->pads.find(request.name) == server->pads.end(), "{}", estr[Error::PadFound]);
 
-        LOG_INFO(logger, "pad {} registerd", name);
-        pad = &server->pads.insert(std::pair{name, Pad{std::string(name), "", client, nullptr}}).first->second;
+        LOG_INFO(logger, "pad {} registerd", request.name);
+        pad = &server->pads.insert(std::pair{request.name, Pad{.name = request.name, .session = this}}).first->second;
     } break;
-    case proto::Type::Unregister: {
+    case proto::UnregisterPad::pt: {
         LOG_INFO(logger, "received unregister request");
 
-        ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
+        coop_ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
 
         LOG_INFO(logger, "unregistering pad {}", pad->name);
-        server->remove_pad(pad);
+        co_await server->remove_pad(pad);
         pad = nullptr;
     } break;
-    case proto::Type::Link: {
-        unwrap(packet, p2p::proto::extract_payload<proto::Link>(payload));
-        ensure(sizeof(proto::Link) + packet.requestee_name_len + packet.secret_len == payload.size());
-        const auto requestee_name = std::string_view(std::bit_cast<char*>(payload.data() + sizeof(proto::Link)), packet.requestee_name_len);
-        const auto secret         = std::span(payload.data() + sizeof(proto::Link) + packet.requestee_name_len, packet.secret_len);
-        LOG_INFO(logger, "received pad link request to {}", requestee_name);
+    case proto::Link::pt: {
+        coop_unwrap(request, (serde::load<net::BinaryFormat, proto::Link>(payload)));
+        LOG_INFO(logger, "received pad link request to {}", request.requestee_name);
 
-        ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
-        ensure(pad->linked == nullptr, "{}", estr[Error::AlreadyLinked]);
-        ensure(pad->authenticator_name.empty(), "{}", estr[Error::AuthInProgress]);
-        const auto it = server->pads.find(requestee_name);
-        ensure(it != server->pads.end(), "{}", estr[Error::PadNotFound]);
+        coop_ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
+        coop_ensure(pad->linked == nullptr, "{}", estr[Error::AlreadyLinked]);
+        coop_ensure(!pad->pending_link_request, "{}", estr[Error::AuthInProgress]);
+        const auto it = server->pads.find(request.requestee_name);
+        coop_ensure(it != server->pads.end(), "{}", estr[Error::PadNotFound]);
         auto& requestee = it->second;
 
-        LOG_INFO(logger, "sending auth request from {} to {}", pad->name, requestee_name);
-        ensure(server->send_to(requestee.client, proto::Type::LinkAuth, 0,
-                               uint16_t(pad->name.size()),
-                               uint16_t(secret.size()),
-                               pad->name,
-                               secret));
-        pad->authenticator_name = requestee.name;
+        LOG_INFO(logger, "sending auth request from {} to {}", pad->name, request.requestee_name);
+        coop_ensure(co_await requestee.session->parser.send_packet(proto::Auth{pad->name, request.secret}));
+        pad->pending_link_request = LinkRequestState{requestee.name, header.id};
+        co_return true; // result is sent after auth_response
     } break;
-    case proto::Type::Unlink: {
+    case proto::Unlink::pt: {
         LOG_INFO(logger, "received unlink request");
 
-        ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
-        ensure(pad->linked != nullptr, "{}", estr[Error::NotLinked]);
+        coop_ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
+        coop_ensure(pad->linked != nullptr, "{}", estr[Error::NotLinked]);
 
         LOG_INFO(logger, "unlinking pad {} and {}", pad->name, pad->linked->name);
-        ensure(server->send_to(pad->linked->client, proto::Type::Unlinked, 0));
+        coop_ensure(co_await pad->linked->session->parser.send_packet(proto::Unlinked()));
         pad->linked->linked = nullptr;
         pad->linked         = nullptr;
     } break;
-    case proto::Type::LinkAuthResponse: {
-        unwrap(packet, p2p::proto::extract_payload<proto::LinkAuthResponse>(payload));
-        const auto requester_name = p2p::proto::extract_last_string<proto::LinkAuthResponse>(payload);
-        LOG_INFO(logger, "received link auth to name={} ok={}", requester_name, int(packet.ok));
+    case proto::AuthResponse::pt: {
+        coop_unwrap(request, (serde::load<net::BinaryFormat, proto::AuthResponse>(payload)));
+        LOG_INFO(logger, "received link auth to name={} ok={}", request.requester_name, request.ok);
 
-        ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
+        coop_ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
 
-        const auto it = server->pads.find(requester_name);
-        ensure(it != server->pads.end(), "{}", estr[Error::PadNotFound]);
+        const auto it = server->pads.find(request.requester_name);
+        coop_ensure(it != server->pads.end(), "{}", estr[Error::PadNotFound]);
         auto& requester = it->second;
-        ensure(!requester.authenticator_name.empty(), "{}", estr[Error::AuthNotInProgress]);
-        ensure(pad->name == requester.authenticator_name, "{}", estr[Error::AutherMismatched]);
+        coop_ensure(requester.pending_link_request, "{}", estr[Error::AuthNotInProgress]);
+        coop_ensure(pad->name == requester.pending_link_request->authenticator_name, "{}", estr[Error::AuthorMismatched]);
 
-        pad->authenticator_name.clear();
-        if(packet.ok == 0) {
-            ensure(server->send_to(requester.client, proto::Type::LinkDenied, header.id));
-        } else {
+        coop_ensure(co_await requester.session->parser.send_packet(proto::Success(), requester.pending_link_request->packet_id));
+        requester.pending_link_request.reset();
+        if(request.ok) {
             LOG_INFO(logger, "linking {} and {}", pad->name, requester.name);
-            ensure(server->send_to(requester.client, proto::Type::LinkSuccess, 0));
             pad->linked      = &requester;
             requester.linked = pad;
         }
+        co_return true;
     } break;
-    default: {
-        LOG_DEBUG(logger, "received general command {}", int(header.type));
-        ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
-        ensure(pad->linked != nullptr, "{}", estr[Error::NotLinked]);
+    case proto::Payload::pt: {
+        coop_ensure(pad != nullptr, "{}", estr[Error::NotRegistered]);
+        coop_ensure(pad->linked != nullptr, "{}", estr[Error::NotLinked]);
 
         LOG_DEBUG(logger, "passthroughing packet from {} to {}", pad->name, pad->linked->name);
-        ensure(server->websocket_context.send(pad->linked->client, payload));
-        return true;
+        // PRINT("packet type={} id={} size={}", header.type, header.id, header.size);
+        // auto& ih = *(net::Header*)(payload.data());
+        // PRINT("inner type={} id={} size={}", ih.type, ih.id, ih.size);
+        // dump_hex(payload);
+        coop_ensure(co_await pad->linked->session->parser.send_packet(proto::Payload::pt, payload.data(), payload.size()));
+        co_return true;
     }
+    default:
+        coop_bail("unknown packet type {}", header.type);
     }
 
 finish:
-    ensure(server->send_to(client, ::p2p::proto::Type::Success, header.id));
-    return true;
+    coop_ensure(co_await parser.send_packet(proto::Success(), header.id));
+    co_return true;
 }
 
-struct SessionDataInitializer : ws::server::SessionDataInitializer {
-    PeerLinker* server;
-
-    auto alloc(ws::server::Client* const client) -> void* override {
-        auto& session  = *(new PeerLinkerSession());
-        session.server = server;
-        session.client = client;
-        LOG_DEBUG(server->logger, "session created {}", &session);
-        return &session;
+auto PeerLinker::remove_pad(Pad* const pad) -> coop::Async<void> {
+    if(pad == nullptr) {
+        co_return;
     }
-
-    auto free(void* ptr) -> void override {
-        auto& session = *std::bit_cast<PeerLinkerSession*>(ptr);
-        server->remove_pad(session.pad);
-        delete &session;
-        LOG_DEBUG(server->logger, "session destroyed {}", &session);
+    if(pad->linked != nullptr) {
+        co_await pad->linked->session->parser.send_packet(proto::Unlinked());
+        pad->linked->linked = nullptr;
     }
+    pads.erase(pad->name);
+}
 
-    SessionDataInitializer(PeerLinker& server)
-        : server(&server) {}
-};
+auto PeerLinker::alloc_session() -> coop::Async<Session*> {
+    auto& session  = *(new PeerLinkerSession());
+    session.server = this;
+    LOG_DEBUG(logger, "session created {}", &session);
+    co_return &session;
+}
+
+auto PeerLinker::free_session(Session* const ptr) -> coop::Async<void> {
+    auto& session = *std::bit_cast<PeerLinkerSession*>(ptr);
+    co_await remove_pad(session.pad);
+    delete &session;
+    LOG_DEBUG(logger, "session destroyed {}", &session);
+}
 } // namespace
-} // namespace p2p::plink
+} // namespace plink
 
 auto main(const int argc, const char* argv[]) -> int {
-    using namespace p2p::plink;
+    using namespace plink;
 
     auto  server = PeerLinker();
     auto& logger = server.logger;
     logger.set_name_and_detect_loglevel("plink");
-    auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
-    ensure(run(argc, argv, 8080, server, std::move(initor), "peer-linker"));
+    ensure(run(argc, argv, 8080, server, "peer-linker"));
     return 0;
 }

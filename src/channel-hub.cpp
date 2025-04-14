@@ -1,21 +1,13 @@
 #include "channel-hub-protocol.hpp"
 #include "macros/logger.hpp"
+#include "protocol.hpp"
 #include "server.hpp"
-#include "util/string-map.hpp"
 
 #define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
-#include "macros/unwrap.hpp"
+#include "macros/coop-unwrap.hpp"
 
-namespace p2p::chub {
+namespace plink {
 namespace {
-struct ChannelHub;
-struct ChannelHubSession;
-
-struct Channel {
-    std::string        name;
-    ChannelHubSession* session;
-};
-
 struct Error {
     enum {
         NotActivated = 0,
@@ -42,183 +34,158 @@ const auto estr = std::array{
 
 static_assert(Error::Limit == estr.size());
 
-struct ChannelHubSession : Session {
-    ChannelHub*         server;
-    ws::server::Client* client;
+struct ChannelHub;
+struct ChannelHubSession;
 
-    auto handle_payload(std::span<const std::byte> payload) -> bool override;
+struct PadRequest {
+    ChannelHubSession* requester;
+    net::PacketID      packet_id;
 };
 
-struct PendingRequest {
-    ChannelHubSession* requester;
-    ChannelHubSession* requestee;
+struct Channel {
+    std::string             name;
+    ChannelHubSession*      session;
+    std::vector<PadRequest> requests;
 };
 
 struct ChannelHub : Server {
-    StringMap<Channel>                           channels;
-    std::unordered_map<uint32_t, PendingRequest> pending_requests;
-    uint32_t                                     packet_id;
+    std::vector<Channel> channels;
+
+    auto alloc_session() -> coop::Async<Session*> override;
+    auto free_session(Session* ptr) -> coop::Async<void> override;
 };
 
-auto ChannelHubSession::handle_payload(const std::span<const std::byte> payload) -> bool {
+struct ChannelHubSession : Session {
+    ChannelHub* server;
+
+    auto handle_payload(net::Header header, net::BytesRef payload) -> coop::Async<bool> override;
+};
+
+auto cond(const std::string& name) -> auto {
+    return [&name](Channel& ch) { return ch.name == name; };
+}
+
+auto ChannelHubSession::handle_payload(const net::Header header, const net::BytesRef payload) -> coop::Async<bool> {
     auto& logger = server->logger;
 
-    unwrap(header, p2p::proto::extract_header(payload));
-
-    if(header.type == ::p2p::proto::Type::ActivateSession) {
-        const auto cert = p2p::proto::extract_last_string<proto::Register>(payload);
-        LOG_INFO(logger, "received activate session");
-        ensure(activate(*server, cert), "failed to verify user certificate");
-        LOG_INFO(logger, "session activated");
+    if(header.type == proto::ActivateSession::pt) {
+        coop_ensure(handle_activation(payload, *server));
         goto finish;
     } else {
-        ensure(activated, "{}", estr[Error::NotActivated]);
+        coop_ensure(activated, "{}", estr[Error::NotActivated]);
     }
 
     switch(header.type) {
-    case ::p2p::proto::Type::Success:
-    case ::p2p::proto::Type::Error:
-        LOG_WARN(logger, "unexpected packet type={}", int(header.type));
-        return true;
-    case proto::Type::Register: {
-        const auto name = p2p::proto::extract_last_string<proto::Register>(payload);
-        LOG_INFO(logger, "received channel register request name={}", name);
+    case proto::RegisterChannel::pt: {
+        coop_unwrap(request, (serde::load<net::BinaryFormat, proto::RegisterChannel>(payload)));
+        LOG_INFO(logger, "received channel register request name={}", request.name);
 
-        ensure(!name.empty(), "{}", estr[Error::EmptyChannelName]);
-        ensure(server->channels.find(name) == server->channels.end(), "{}", estr[Error::ChannelFound]);
+        coop_ensure(!request.name.empty(), "{}", estr[Error::EmptyChannelName]);
+        coop_ensure(std::ranges::find_if(server->channels, cond(request.name)) == server->channels.end(), "{}", estr[Error::ChannelFound]);
 
-        LOG_INFO(logger, "channel {} registerd", name);
-        server->channels.insert(std::pair{name, Channel{std::string(name), this}});
+        LOG_INFO(logger, "channel {} registerd", request.name);
+        server->channels.push_back(Channel{request.name, this});
     } break;
-    case proto::Type::Unregister: {
-        const auto name = p2p::proto::extract_last_string<proto::Unregister>(payload);
-        LOG_INFO(logger, "received channel unregister request name={}", name);
+    case proto::UnregisterChannel::pt: {
+        coop_unwrap(request, (serde::load<net::BinaryFormat, proto::UnregisterChannel>(payload)));
+        LOG_INFO(logger, "received channel unregister request name={}", request.name);
 
-        const auto it = server->channels.find(name);
-        ensure(it != server->channels.end(), "{}", estr[Error::ChannelNotFound]);
-        auto& channel = it->second;
-        ensure(channel.session == this, "{}", estr[Error::SenderMismatch]);
+        const auto it = std::ranges::find_if(server->channels, cond(request.name));
+        coop_ensure(it != server->channels.end(), "{}", estr[Error::ChannelNotFound]);
+        auto& channel = *it;
+        coop_ensure(channel.session == this, "{}", estr[Error::SenderMismatch]);
 
         LOG_INFO(logger, "unregistering channel {}", channel.name);
         server->channels.erase(it);
     } break;
-    case proto::Type::GetChannels: {
+    case proto::GetChannels::pt: {
         LOG_INFO(logger, "received channel list request");
-        auto payload = std::vector<std::byte>();
-        for(auto it = server->channels.begin(); it != server->channels.end(); it = std::next(it)) {
-            const auto& name      = it->second.name;
-            const auto  prev_size = payload.size();
-            payload.resize(prev_size + name.size() + 1);
-            std::memcpy(payload.data() + prev_size, name.data(), name.size() + 1);
+        auto payload = std::vector<std::string>();
+        for(auto& channel : server->channels) {
+            payload.push_back(channel.name);
         }
-
-        ensure(server->send_to(client, proto::Type::GetChannelsResponse, header.id, payload));
-        return true;
+        coop_ensure(co_await parser.send_packet(proto::Channels{std::move(payload)}, header.id));
+        co_return true;
     } break;
-    case proto::Type::PadRequest: {
-        const auto name = p2p::proto::extract_last_string<proto::PadRequest>(payload);
-        LOG_INFO(logger, "received pad request for channel={}", name);
+    case proto::RequestPad::pt: {
+        coop_unwrap(request, (serde::load<net::BinaryFormat, proto::RequestPad>(payload)));
+        LOG_INFO(logger, "received pad request for channel={}", request.channel_name);
 
-        // check if another request is pending
-        for(auto i = server->pending_requests.begin(); i != server->pending_requests.end(); i = std::next(i)) {
-            ensure(i->second.requester != this, "{}", estr[Error::AnotherRequestPending]);
-        }
+        const auto it = std::ranges::find_if(server->channels, cond(request.channel_name));
+        coop_ensure(it != server->channels.end(), "{}", estr[Error::ChannelNotFound]);
+        auto& channel = *it;
 
-        const auto it = server->channels.find(name);
-        ensure(it != server->channels.end(), "{}", estr[Error::ChannelNotFound]);
-        auto& channel = it->second;
-
-        const auto id = server->packet_id += 1;
-        ensure(server->send_to(channel.session->client, proto::Type::PadRequest, id, name));
-        server->pending_requests.insert({id, PendingRequest{.requester = this, .requestee = channel.session}});
+        coop_ensure(co_await channel.session->parser.send_packet(proto::RequestPad{request.channel_name}));
+        channel.requests.push_back({this, header.id});
+        PRINT("name={} size={}", channel.name, channel.requests.size());
+        co_return true;
     } break;
-    case proto::Type::PadRequestResponse: {
-        LOG_INFO(logger, "received pad request response");
+    case proto::PadCreated::pt: {
+        coop_unwrap(request, (serde::load<net::BinaryFormat, proto::PadCreated>(payload)));
+        LOG_INFO(logger, "received pad request response channel={} name={}", request.channel_name, request.pad_name);
 
-        unwrap(packet, p2p::proto::extract_payload<proto::PadRequestResponse>(payload));
-        const auto pad_name = p2p::proto::extract_last_string<proto::PadRequestResponse>(payload);
+        const auto it = std::ranges::find_if(server->channels, cond(request.channel_name));
+        coop_ensure(it != server->channels.end(), "{}", estr[Error::ChannelNotFound]);
+        auto& channel = *it;
+        coop_ensure(channel.session == this, "{}", estr[Error::SenderMismatch]);
 
-        const auto request_it = server->pending_requests.find(header.id);
-        ensure(request_it != server->pending_requests.end(), "{}", estr[Error::RequesterNotFound]);
-        const auto request = request_it->second;
-        server->pending_requests.erase(request_it);
+        coop_ensure(!channel.requests.empty(), "{}", estr[Error::RequesterNotFound]);
+        const auto pad_request = channel.requests.front();
+        channel.requests.erase(channel.requests.begin());
 
-        LOG_INFO(logger, "sending pad name ok={} pad_name={}", packet.ok, pad_name);
-        ensure(server->send_to(request.requester->client, proto::Type::PadRequestResponse, 0, packet.ok, pad_name));
+        LOG_INFO(logger, "sending pad created name={}", request.pad_name);
+        coop_ensure(co_await pad_request.requester->parser.send_packet(proto::PadCreated::pt, payload.data(), payload.size(), pad_request.packet_id));
     } break;
-    default: {
-        bail("unknown command {}", int(header.type));
-    }
+    default:
+        coop_bail("unknown command {}", int(header.type));
     }
 
 finish:
-    ensure(server->send_to(client, ::p2p::proto::Type::Success, header.id));
-    return true;
+    coop_ensure(co_await parser.send_packet(proto::Success(), header.id));
+    co_return true;
 }
 
-struct SessionDataInitializer : ws::server::SessionDataInitializer {
-    ChannelHub* server;
+auto ChannelHub::alloc_session() -> coop::Async<Session*> {
+    auto& session  = *(new ChannelHubSession());
+    session.server = this;
+    LOG_DEBUG(logger, "session created {}", &session);
+    co_return &session;
+}
 
-    auto alloc(ws::server::Client* client) -> void* override {
-        auto& session  = *(new ChannelHubSession());
-        session.server = server;
-        session.client = client;
-        LOG_DEBUG(server->logger, "session created {}", &session);
-        return &session;
+auto ChannelHub::free_session(Session* const ptr) -> coop::Async<void> {
+    auto& session = *std::bit_cast<ChannelHubSession*>(ptr);
+
+    // remove hosting channels
+    for(auto i = channels.begin(); i != channels.end();) {
+        auto& channel = *i;
+        if(channel.session != &session) {
+            // cancel requests from this session
+            for(auto r = channel.requests.end(); r < channel.requests.end();) {
+                r = r->requester == &session ? channel.requests.erase(r) : r + 1;
+            }
+            i += 1;
+            continue;
+        }
+        LOG_INFO(logger, "unregistering channel {}", channel.name);
+        // cancel requests to this session
+        for(const auto& request : channel.requests) {
+            coop_ensure(co_await request.requester->parser.send_packet(proto::Error(), request.packet_id));
+        }
+        i = channels.erase(i);
     }
 
-    auto free(void* const ptr) -> void override {
-        auto& session = *std::bit_cast<ChannelHubSession*>(ptr);
+    delete &session;
+    LOG_DEBUG(logger, "session destroyed {}", &session);
+}
+} // namespace
+} // namespace plink
 
-        // remove corresponding channels
-        auto& channels = server->channels;
-        for(auto i = channels.begin(); i != channels.end();) {
-            const auto& channel = i->second;
-            if(channel.session == &session) {
-                LOG_INFO(server->logger, "unregistering channel {}", channel.name);
-                i = channels.erase(i);
-            } else {
-                i = std::next(i);
-            }
-        }
+auto main(const int argc, const char* argv[]) -> int {
+    using namespace plink;
 
-        // remove from pending list
-        auto& requests = server->pending_requests;
-        for(auto i = requests.begin(); i != requests.end(); i = std::next(i)) {
-            const auto& request = i->second;
-            if(request.requester == &session) {
-                // pad requester has gone.
-                // delete request
-                requests.erase(i);
-                break;
-            } else if(request.requestee == &session) {
-                // pad requestee has gone.
-                // delete request and send fail to requester
-                server->send_to(request.requester->client, proto::Type::PadRequestResponse, 0, uint16_t(0));
-                requests.erase(i);
-                break;
-            }
-        }
-
-        delete &session;
-        LOG_DEBUG(server->logger, "session destroyed {}", &session);
-    }
-
-    SessionDataInitializer(ChannelHub& server)
-        : server(&server) {}
-};
-
-auto run(const int argc, const char* argv[]) -> bool {
     auto  server = ChannelHub();
     auto& logger = server.logger;
     logger.set_name_and_detect_loglevel("chub");
-    auto initor = std::unique_ptr<ws::server::SessionDataInitializer>(new SessionDataInitializer(server));
-    ensure(run(argc, argv, 8081, server, std::move(initor), "channel-hub"));
-    return true;
-}
-} // namespace
-} // namespace p2p::chub
-
-auto main(const int argc, const char* argv[]) -> int {
-    return p2p::chub::run(argc, argv) ? 0 : 1;
+    ensure(run(argc, argv, 8081, server, "channel-hub"));
+    return 0;
 }

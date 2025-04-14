@@ -1,25 +1,23 @@
 #pragma once
-#include <cstdint>
+#include "net/common.hpp"
 
-namespace p2p::proto {
-struct Type {
-    enum : uint16_t {
-        Success,
-        Error,
-        ActivateSession,
-
-        Limit,
-    };
+namespace plink::proto {
+// server -> client => () indicate success
+struct Success {
+    constexpr static auto pt = net::PacketType(0x00);
 };
 
-struct Packet {
-    uint16_t size; // total size in bytes, including this header
-    uint16_t type;
-    uint32_t id;
-} __attribute__((packed));
-
-struct ActivateSession : ::p2p::proto::Packet {
-    // char user_certificate[];
+// server -> client => () indicate error
+struct Error {
+    constexpr static auto pt = net::PacketType(0x01);
 };
 
-} // namespace p2p::proto
+// server <- client => (Success) send user certificate to active session
+struct ActivateSession {
+    constexpr static auto pt = net::PacketType(0x02);
+
+    SerdeFieldsBegin;
+    std::string SerdeField(user_certificate);
+    SerdeFieldsEnd;
+};
+} // namespace plink::proto

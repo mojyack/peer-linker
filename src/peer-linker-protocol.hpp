@@ -1,48 +1,64 @@
 #pragma once
-#include "protocol.hpp"
+#include "net/common.hpp"
 
-namespace p2p::plink::proto {
 // client <-> (pad: server :pad) <-> client
+namespace plink::proto {
+// server <- client => (Result) create pad in server
+struct RegisterPad {
+    constexpr static auto pt = net::PacketType(0x03);
 
-struct Type {
-    enum : uint16_t {
-        Register = ::p2p::proto::Type::Limit, // server <-  client => (Success|Error) create pad in server
-        Unregister,                           // server <-  client => (Success|Error) delete pad in server
-        Link,                                 // server <-  client => (Success|Error) ask server to link self pad to another pad
-        Unlink,                               // server <-  client => (Success|Error) delete link
-        LinkSuccess,                          // server  -> client => () notify client to linked successfully
-        LinkDenied,                           // server  -> client => () notify client to link denied
-        Unlinked,                             // server  -> client => () notify client to unlinked by other pad
-        LinkAuth,                             // server  -> client => (LinkAuthResponse) ask client to whether a pad is linkable to his
-        LinkAuthResponse,                     // server <-  client => (Success|Error) accept pad linking
-
-        Limit,
-    };
+    SerdeFieldsBegin;
+    std::string SerdeField(name);
+    SerdeFieldsEnd;
 };
 
-struct Register : ::p2p::proto::Packet {
-    // char name[];
+// server <- client => (Result) delete pad in server
+struct UnregisterPad {
+    constexpr static auto pt = net::PacketType(0x04);
 };
 
-struct Link : ::p2p::proto::Packet {
-    uint16_t requestee_name_len;
-    uint16_t secret_len;
-    // char requestee_name[];
-    // std::byte secret[];
+// server <- client => (Result) ask server to link self pad to another pad
+struct Link {
+    constexpr static auto pt = net::PacketType(0x05);
+
+    SerdeFieldsBegin;
+    std::string     SerdeField(requestee_name);
+    net::BytesArray SerdeField(secret);
+    SerdeFieldsEnd;
 };
 
-struct Unlink : ::p2p::proto::Packet {
+// server <- client => (Result) delete link
+struct Unlink {
+    constexpr static auto pt = net::PacketType(0x06);
 };
 
-struct LinkAuth : ::p2p::proto::Packet {
-    uint16_t requester_name_len;
-    uint16_t secret_len;
-    // char requester_name[];
-    // std::byte secret[];
+// server -> client => () notify client to unlinked by other pad
+struct Unlinked {
+    constexpr static auto pt = net::PacketType(0x07);
 };
 
-struct LinkAuthResponse : ::p2p::proto::Packet {
-    uint16_t ok;
-    // char requester_name[];
+// server -> client => (AuthResponse) ask client to whether a pad is linkable to his
+struct Auth {
+    constexpr static auto pt = net::PacketType(0x08);
+
+    SerdeFieldsBegin;
+    std::string     SerdeField(requester_name);
+    net::BytesArray SerdeField(secret);
+    SerdeFieldsEnd;
 };
-} // namespace p2p::plink::proto
+
+// server <- client => () accept pad linking
+struct AuthResponse {
+    constexpr static auto pt = net::PacketType(0x09);
+
+    SerdeFieldsBegin;
+    std::string SerdeField(requester_name);
+    bool        SerdeField(ok);
+    SerdeFieldsEnd;
+};
+
+// server <-> client => () payload to passthrough to the linked pad
+struct Payload {
+    constexpr static auto pt = net::PacketType(0x10);
+};
+} // namespace plink::proto

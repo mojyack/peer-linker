@@ -1,18 +1,19 @@
-subdir('ws')
+subdir('net')
+subdir('net/tcp')
+subdir('net/enc')
 
-p2p_client_common_files = files(
-  'event-manager.cpp',
-  'peer-linker-session.cpp',
-  'websocket-session.cpp',
-) + ws_files + ws_client_files
-p2p_client_common_deps = ws_deps
+plink_client_files = files(
+  'peer-linker-client.cpp',
+) + netprotocol_files \
+  + netprotocol_tcp_client_files \
+  + netprotocol_enc_client_files
 
-p2p_client_ice_files = files(
-  'ice-session.cpp',
-) + p2p_client_common_files
-p2p_client_ice_deps = [dependency('libjuice')] + p2p_client_common_deps
+plink_client_deps = crypto_utils_deps + netprotocol_deps + netprotocol_tcp_deps + netprotocol_enc_deps
 
-p2p_client_chub_files = files(
+chub_client_files = files(
   'channel-hub-client.cpp',
-) + p2p_client_common_files
-p2p_client_chub_deps = p2p_client_common_deps
+) + netprotocol_files \
+  + netprotocol_tcp_client_files \
+  + netprotocol_enc_client_files
+
+chub_client_deps = crypto_utils_deps + netprotocol_deps + netprotocol_tcp_deps + netprotocol_enc_deps

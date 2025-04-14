@@ -1,138 +1,54 @@
-#include <utility>
-
 #include "channel-hub-client.hpp"
 #include "channel-hub-protocol.hpp"
-#include "macros/unwrap.hpp"
-#include "protocol-helper.hpp"
+#include "macros/coop-unwrap.hpp"
+#include "net/tcp/client.hpp"
+#include "protocol.hpp"
 
-namespace p2p::chub {
-struct EventKind {
-    enum {
-        Channels = wss::EventKind::Limit,
-        PadCreated,
+namespace plink {
+auto ChannelHubClient::register_channel(std::string channel) -> coop::Async<bool> {
+    coop_ensure(co_await parser.receive_response<proto::Success>(proto::RegisterChannel{std::move(channel)}));
+    co_return true;
+}
 
-        Limit,
+auto ChannelHubClient::unregister_channel(std::string channel) -> coop::Async<bool> {
+    coop_ensure(co_await parser.receive_response<proto::Success>(proto::UnregisterChannel{std::move(channel)}));
+    co_return true;
+}
+
+auto ChannelHubClient::get_channels() -> coop::Async<std::optional<std::vector<std::string>>> {
+    coop_unwrap_mut(channels, co_await parser.receive_response<proto::Channels>(proto::GetChannels()));
+    co_return std::move(channels.channels);
+}
+
+auto ChannelHubClient::request_pad(std::string channel) -> coop::Async<std::optional<std::string>> {
+    coop_unwrap_mut(resp, co_await parser.receive_response<proto::PadCreated>(proto::RequestPad{std::move(channel)}));
+    coop_ensure(!resp.pad_name.empty());
+    co_return std::move(resp.pad_name);
+}
+
+auto ChannelHubClient::connect(const char* const addr, const uint16_t port, std::string user_certificate) -> coop::Async<bool> {
+    // this->backend.reset(backend);
+    backend.on_closed   = [this] { on_closed(); };
+    backend.on_received = [this](net::BytesRef data) -> coop::Async<void> {
+        if(const auto p = parser.parse_received(data)) {
+            co_await parser.callbacks.invoke(p->header, p->payload);
+        }
     };
-};
-
-// ChannelHubSession
-auto ChannelHubSession::start(const ChannelHubSessionParams& params) -> bool {
-    ensure(wss::WebSocketSession::start({
-        .server    = params.channel_hub,
-        .ssl_level = params.channel_hub_allow_self_signed ? ws::client::SSLLevel::TrustSelfSigned : ws::client::SSLLevel::Enable,
-        .protocol  = "channel-hub",
-        .keepalive = params.keepalive,
-    }));
-    ensure(send_packet(::p2p::proto::Type::ActivateSession, params.user_certificate));
-    return true;
-}
-
-ChannelHubSession::~ChannelHubSession() {
-    destroy();
-}
-
-// ChannelHubSender
-auto ChannelHubSender::on_packet_received(const std::span<const std::byte> payload) -> bool {
-    unwrap(header, ::p2p::proto::extract_header(payload));
-
-    switch(header.type) {
-    case ::p2p::proto::Type::Success:
-        events.invoke(wss::EventKind::Result, header.id, 1);
-        return true;
-    case ::p2p::proto::Type::Error:
-        events.invoke(wss::EventKind::Result, header.id, 0);
-        return true;
-    case proto::Type::PadRequest: {
-        const auto channel_name = ::p2p::proto::extract_last_string<proto::PadRequest>(payload);
-        if(!on_pad_request(header.id, channel_name)) {
-            notify_pad_not_created(header.id);
+    parser.send_data                                = [this](net::BytesRef data) { return backend.send(data); };
+    parser.callbacks.by_type[proto::RequestPad::pt] = [this](net::Header header, net::BytesRef payload) -> coop::Async<bool> {
+        constexpr auto error_value = false;
+        co_unwrap_v_mut(request, (serde::load<net::BinaryFormat, proto::RequestPad>(payload)));
+        auto pad_name = co_await on_pad_request(request.channel_name);
+        auto result   = proto::PadCreated{std::move(request.channel_name)};
+        if(pad_name) {
+            result.pad_name = std::move(*pad_name);
         }
-        return true;
-    }
-    default:
-        return wss::WebSocketSession::on_packet_received(payload);
-    }
+        co_ensure_v(co_await parser.send_packet(std::move(result), header.id));
+        co_return true;
+    };
+
+    coop_ensure(co_await backend.connect(new net::tcp::TCPClientBackend(), addr, port));
+    coop_ensure(co_await parser.receive_response<proto::Success>(proto::ActivateSession{std::move(user_certificate)}));
+    co_return true;
 }
-
-auto ChannelHubSender::register_result_callback(const uint16_t request_id) -> bool {
-    return events.register_callback(wss::EventKind::Result, request_id,
-                                    [](const uint32_t result) {
-                                        ensure_v(result, "failed to send pad request response");
-                                    });
-}
-
-auto ChannelHubSender::register_channel(const std::string_view name) -> bool {
-    ensure(send_packet(proto::Type::Register, name));
-    return true;
-}
-
-auto ChannelHubSender::unregister_channel(const std::string_view name) -> bool {
-    ensure(send_packet(proto::Type::Unregister, name));
-    return true;
-}
-
-auto ChannelHubSender::notify_pad_created(const uint16_t request_id, const std::string_view pad_name) -> bool {
-    ensure(register_result_callback(request_id));
-    send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(1), pad_name);
-    return true;
-}
-
-auto ChannelHubSender::notify_pad_not_created(const uint16_t request_id) -> bool {
-    ensure(register_result_callback(request_id));
-    send_generic_packet(proto::Type::PadRequestResponse, request_id, uint16_t(0));
-    return true;
-}
-
-// ChannelHubReceiver
-auto ChannelHubReceiver::on_packet_received(const std::span<const std::byte> payload) -> bool {
-    unwrap(header, ::p2p::proto::extract_header(payload));
-
-    switch(header.type) {
-    case proto::Type::GetChannelsResponse: {
-        const auto channels = ::p2p::proto::extract_last_string<proto::GetChannelsResponse>(payload);
-        // TODO: use packet id
-        if(!std::exchange(channels_buffer, channels).empty()) {
-            WARN("previous get channels response not handled");
-        }
-        events.invoke(EventKind::Channels, header.id, no_value);
-        return true;
-    }
-    case proto::Type::PadRequestResponse: {
-        unwrap(packet, ::p2p::proto::extract_payload<proto::PadRequestResponse>(payload));
-        pad_name_buffer = ::p2p::proto::extract_last_string<proto::PadRequestResponse>(payload);
-        events.invoke(EventKind::PadCreated, no_id, packet.ok);
-        return true;
-    }
-    default:
-        return wss::WebSocketSession::on_packet_received(payload);
-    }
-}
-
-auto ChannelHubReceiver::get_channels() -> std::optional<std::vector<std::string>> {
-    const auto id = allocate_packet_id();
-    send_generic_packet(proto::Type::GetChannels, id);
-    ensure(events.wait_for(EventKind::Channels, id));
-
-    const auto channels_str = std::exchange(channels_buffer, {});
-    auto       channels     = std::vector<std::string>();
-
-    // split string array
-    auto head = 0uz;
-    auto tail = channels_str.find('\0');
-    while(tail != channels_str.npos) {
-        channels.emplace_back(channels_str.substr(head, tail - head));
-        head = tail + 1;
-        tail = channels_str.find('\0', tail + 1);
-    }
-
-    return channels;
-}
-
-auto ChannelHubReceiver::request_pad(const std::string_view channel_name) -> std::optional<std::string> {
-    const auto id = allocate_packet_id();
-    send_generic_packet(proto::Type::PadRequest, id, channel_name);
-    unwrap(result, events.wait_for(EventKind::PadCreated));
-    ensure(result == 1);
-    return pad_name_buffer;
-}
-} // namespace p2p::chub
+} // namespace plink
