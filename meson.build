@@ -3,7 +3,6 @@ add_project_arguments('-Wno-missing-field-initializers', language : 'cpp')
 add_project_arguments('-Wfatal-errors', language : 'cpp')
 
 subdir('src')
-subdir('src/crypto')
 subdir('src/spawn')
 
 session_key_files = files(
