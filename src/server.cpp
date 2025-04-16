@@ -3,13 +3,14 @@
 #include <optional>
 #include <string_view>
 
+#include <coop/lock-guard.hpp>
+
 #include "macros/logger.hpp"
 #include "net/enc/server.hpp"
 #include "net/tcp/server.hpp"
 #include "protocol.hpp"
 #include "server.hpp"
 #include "util/argument-parser.hpp"
-#include "util/cleaner.hpp"
 #include "util/file-io.hpp"
 
 #define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
@@ -97,9 +98,7 @@ auto run(const int argc, const char* const* const argv, uint16_t port, Server& s
     // setup network backend
     const auto backend    = new net::enc::ServerBackendEncAdaptor();
     backend->alloc_client = [&server, &logger](net::ClientData& client) -> coop::Async<void> {
-        auto cleaner = Cleaner{[&server] { server.mutex.unlock(); }};
-        co_await server.mutex.lock();
-
+        const auto lock       = co_await coop::LockGuard::lock(server.mutex);
         const auto ptr        = co_await server.alloc_session();
         ptr->parser.send_data = [&server, &client, &logger](net::BytesRef data) -> coop::Async<bool> {
             const auto error_value = false;
@@ -109,15 +108,12 @@ auto run(const int argc, const char* const* const argv, uint16_t port, Server& s
         client.data = ptr;
     };
     backend->free_client = [&server](void* ptr) -> coop::Async<void> {
-        auto cleaner = Cleaner{[&server] { server.mutex.unlock(); }};
-        co_await server.mutex.lock();
+        const auto lock = co_await coop::LockGuard::lock(server.mutex);
         co_await server.free_session(std::bit_cast<Session*>(ptr));
     };
     backend->on_received = [&server](const net::ClientData& client, net::BytesRef data) -> coop::Async<void> {
-        auto cleaner = Cleaner{[&server] { server.mutex.unlock(); }};
-        co_await server.mutex.lock();
-
-        auto& session = *std::bit_cast<Session*>(client.data);
+        const auto lock    = co_await coop::LockGuard::lock(server.mutex);
+        auto&      session = *std::bit_cast<Session*>(client.data);
         if(const auto p = session.parser.parse_received(data)) {
             if(!co_await session.handle_payload(p->header, p->payload) && p->header.type != proto::Error::pt /*do not reply to error packet*/) {
                 co_await session.parser.send_packet(proto::Error(), p->header.id);

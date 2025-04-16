@@ -1,3 +1,3 @@
 crypto-utils https://github.com/mojyack/crypto-utils 2c6e3b8ccbc6cdd29680f90580066dc8bc784adc
-netprotocol https://github.com/mojyack/netprotocol 6d50b3bb05348b59b9790d3b649c23fc20d84565
+netprotocol https://github.com/mojyack/netprotocol 9feb5fdd5ffeb0e543697b85d3500c64cee49302
 process-spawn-cpp https://github.com/mojyack/process-spawn-cpp 5bb95b1612858775909a7e302ac2b7b9bf971228
