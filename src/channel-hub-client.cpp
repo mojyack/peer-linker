@@ -30,9 +30,7 @@ auto ChannelHubClient::connect(const char* const addr, const uint16_t port, std:
     // this->backend.reset(backend);
     backend.on_closed   = [this] { on_closed(); };
     backend.on_received = [this](PrependableBuffer buffer) -> coop::Async<void> {
-        coop_unwrap(parsed, net::split_header(buffer.body()));
-        const auto [header, _] = parsed;
-        co_await parser.callbacks.invoke(header, std::move(buffer));
+        co_await parser.callbacks.invoke(std::move(buffer));
     };
     parser.send_data                                = [this](PrependableBuffer buffer) { return backend.send(std::move(buffer)); };
     parser.callbacks.by_type[proto::RequestPad::pt] = [this](const net::Header header, PrependableBuffer buffer) -> coop::Async<bool> {
