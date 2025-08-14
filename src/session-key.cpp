@@ -23,7 +23,7 @@ auto SessionKey::generate_user_certificate(const std::string_view content) -> st
 
 auto SessionKey::verify_user_certificate_hash(const std::string_view hash_str, const std::string_view content) -> bool {
     ensure(hash_str.size() % 4 == 0, "not a base64 encoded string");
-    const auto hash = crypto::base64::decode(hash_str);
+    unwrap(hash, crypto::base64::decode(hash_str));
     unwrap(computed_hash, crypto::hmac::compute_hmac_sha256(secret, to_span(content)));
     ensure(hash.size() == computed_hash.size(), "not a valid certification hash");
     ensure(std::memcmp(hash.data(), computed_hash.data(), hash.size()) == 0, "hash mismatched");

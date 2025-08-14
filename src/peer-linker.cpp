@@ -67,11 +67,14 @@ struct PeerLinkerSession : Session {
     PeerLinker* server;
     Pad*        pad = nullptr;
 
-    auto handle_payload(net::Header header, net::BytesRef payload) -> coop::Async<bool> override;
+    auto on_received(PrependableBuffer buffer) -> coop::Async<bool> override;
 };
 
-auto PeerLinkerSession::handle_payload(const net::Header header, const net::BytesRef payload) -> coop::Async<bool> {
+auto PeerLinkerSession::on_received(PrependableBuffer buffer) -> coop::Async<bool> {
     auto& logger = server->logger;
+
+    coop_unwrap(parsed, net::split_header(buffer.body()));
+    const auto [header, payload] = parsed;
 
     if(header.type == proto::ActivateSession::pt) {
         coop_ensure(handle_activation(payload, *server));
@@ -154,11 +157,15 @@ auto PeerLinkerSession::handle_payload(const net::Header header, const net::Byte
         coop_ensure(pad->linked != nullptr, "{}", estr[Error::NotLinked]);
 
         LOG_DEBUG(logger, "passthroughing packet from {} to {}", pad->name, pad->linked->name);
-        // PRINT("packet type={} id={} size={}", header.type, header.id, header.size);
-        // auto& ih = *(net::Header*)(payload.data());
-        // PRINT("inner type={} id={} size={}", ih.type, ih.id, ih.size);
-        // dump_hex(payload);
-        coop_ensure(co_await pad->linked->session->parser.send_packet(proto::Payload::pt, payload.data(), payload.size()));
+        if(0) {
+            PRINT("packet type={} id={} size={}", header.type, header.id, header.size);
+            auto& ih = *(net::Header*)(payload.data());
+            PRINT("inner type={} id={} size={}", ih.type, ih.id, ih.size);
+            // dump_hex(payload);
+        }
+        // remove header from buffer so that we can existing storage
+        buffer.shrink_backward(sizeof(net::Header));
+        coop_ensure(co_await pad->linked->session->parser.send_packet(proto::Payload::pt, std::move(buffer)));
         co_return true;
     }
     default:

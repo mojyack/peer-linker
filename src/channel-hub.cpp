@@ -58,15 +58,18 @@ struct ChannelHub : Server {
 struct ChannelHubSession : Session {
     ChannelHub* server;
 
-    auto handle_payload(net::Header header, net::BytesRef payload) -> coop::Async<bool> override;
+    auto on_received(PrependableBuffer buffer) -> coop::Async<bool> override;
 };
 
 auto cond(const std::string& name) -> auto {
     return [&name](Channel& ch) { return ch.name == name; };
 }
 
-auto ChannelHubSession::handle_payload(const net::Header header, const net::BytesRef payload) -> coop::Async<bool> {
+auto ChannelHubSession::on_received(PrependableBuffer buffer) -> coop::Async<bool> {
     auto& logger = server->logger;
+
+    coop_unwrap(parsed, net::split_header(buffer.body()));
+    const auto [header, payload] = parsed;
 
     if(header.type == proto::ActivateSession::pt) {
         coop_ensure(handle_activation(payload, *server));
@@ -134,7 +137,9 @@ auto ChannelHubSession::handle_payload(const net::Header header, const net::Byte
         channel.requests.erase(channel.requests.begin());
 
         LOG_INFO(logger, "sending pad created name={}", request.pad_name);
-        coop_ensure(co_await pad_request.requester->parser.send_packet(proto::PadCreated::pt, payload.data(), payload.size(), pad_request.packet_id));
+        // remove header from buffer so that we can existing storage
+        buffer.shrink_backward(sizeof(net::Header));
+        coop_ensure(co_await pad_request.requester->parser.send_packet(proto::PadCreated::pt, std::move(buffer), pad_request.packet_id));
     } break;
     default:
         coop_bail("unknown command {}", int(header.type));

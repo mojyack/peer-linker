@@ -14,7 +14,7 @@
 #include "util/file-io.hpp"
 
 #define CUTIL_MACROS_PRINT_FUNC(...) LOG_ERROR(logger, __VA_ARGS__)
-#include "macros/unwrap.hpp"
+#include "macros/coop-unwrap.hpp"
 
 #if defined(_WIN32)
 #include "spawn/process-win.hpp"
@@ -97,13 +97,11 @@ auto run(const int argc, const char* const* const argv, uint16_t port, Server& s
 
     // setup network backend
     const auto backend    = new net::enc::ServerBackendEncAdaptor();
-    backend->alloc_client = [&server, &logger](net::ClientData& client) -> coop::Async<void> {
+    backend->alloc_client = [&server](net::ClientData& client) -> coop::Async<void> {
         const auto lock       = co_await coop::LockGuard::lock(server.mutex);
         const auto ptr        = co_await server.alloc_session();
-        ptr->parser.send_data = [&server, &client, &logger](net::BytesRef data) -> coop::Async<bool> {
-            const auto error_value = false;
-            co_ensure_v(co_await server.backend->send(client, data));
-            co_return true;
+        ptr->parser.send_data = [&server, &client](PrependableBuffer buffer) -> coop::Async<bool> {
+            return server.backend->send(client, std::move(buffer));
         };
         client.data = ptr;
     };
@@ -111,13 +109,13 @@ auto run(const int argc, const char* const* const argv, uint16_t port, Server& s
         const auto lock = co_await coop::LockGuard::lock(server.mutex);
         co_await server.free_session(std::bit_cast<Session*>(ptr));
     };
-    backend->on_received = [&server](const net::ClientData& client, net::BytesRef data) -> coop::Async<void> {
+    backend->on_received = [&server, &logger](const net::ClientData& client, PrependableBuffer buffer) -> coop::Async<void> {
         const auto lock    = co_await coop::LockGuard::lock(server.mutex);
         auto&      session = *std::bit_cast<Session*>(client.data);
-        if(const auto p = session.parser.parse_received(data)) {
-            if(!co_await session.handle_payload(p->header, p->payload) && p->header.type != proto::Error::pt /*do not reply to error packet*/) {
-                co_await session.parser.send_packet(proto::Error(), p->header.id);
-            }
+        coop_unwrap(parsed, net::split_header(buffer.body()));
+        const auto [header, _] = parsed;
+        if(!co_await session.on_received(std::move(buffer)) && header.type != proto::Error::pt /*do not reply to error packet*/) {
+            co_await session.parser.send_packet(proto::Error(), header.id);
         }
         co_return;
     };

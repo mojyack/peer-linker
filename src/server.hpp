@@ -14,7 +14,7 @@ struct Session {
     bool              activated = false;
 
     auto         handle_activation(net::BytesRef payload, Server& server) -> bool;
-    virtual auto handle_payload(net::Header header, net::BytesRef payload) -> coop::Async<bool> = 0;
+    virtual auto on_received(PrependableBuffer buffer) -> coop::Async<bool> = 0;
 
     virtual ~Session() {}
 };

@@ -13,7 +13,7 @@ struct PeerLinkerClientBackend : net::ClientBackend {
     net::PacketParser                 parser;
 
     // overrides
-    auto send(net::BytesRef data) -> coop::Async<bool> override;
+    auto send(PrependableBuffer buffer) -> coop::Async<bool> override;
     auto finish() -> coop::Async<bool> override;
 
     // backend-specific
