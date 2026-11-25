@@ -17,13 +17,13 @@ struct PeerLinkerClientBackend : net::ClientBackend {
     auto finish() -> coop::Async<bool> override;
 
     // backend-specific
-    std::function<void()>                                            on_pad_created  = [] {};
-    std::function<bool(std::string_view name, net::BytesRef secret)> on_auth_request = [](std::string_view, net::BytesRef) { return false; };
+    std::function<void()>                                        on_pad_created  = [] {};
+    std::function<bool(std::string_view name, BytesSpan secret)> on_auth_request = [](std::string_view, BytesSpan) { return false; };
 
     struct Params {
         struct PeerInfo {
-            std::string     pad_name;
-            net::BytesArray secret;
+            std::string pad_name;
+            BytesVec    secret;
         };
 
         const char*             peer_linker_addr;

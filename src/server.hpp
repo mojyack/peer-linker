@@ -13,7 +13,7 @@ struct Session {
     net::PacketParser parser;
     bool              activated = false;
 
-    auto         handle_activation(net::BytesRef payload, Server& server) -> bool;
+    auto         handle_activation(BytesSpan payload, Server& server) -> bool;
     virtual auto on_received(PrependableBuffer buffer) -> coop::Async<bool> = 0;
 
     virtual ~Session() {}

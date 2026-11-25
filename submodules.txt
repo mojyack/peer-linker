@@ -1,5 +1,5 @@
-cutil https://github.com/mojyack/cutil.git f614447a9f37e3b0cfb50017ceb3ab7f91693ffe
+cutil https://github.com/mojyack/cutil.git 9bab1bbd6cd836bc5d3062ed7b48131ea63e35fe
 cutil-macros https://github.com/mojyack/cutil-macros.git e3d95d06be45548f4bd5a195a6c9a54a7b24f072
-crypto-utils https://github.com/mojyack/crypto-utils fead15d35f50809a057fc544966afaffa3e6d3c8
-netprotocol https://github.com/mojyack/netprotocol 0fd1c1d2be419126b513ea6871597380d832fa2c
+crypto-utils https://github.com/mojyack/crypto-utils 4740c230e17cf9fc7b0f6b8034b3596772106d19
+netprotocol https://github.com/mojyack/netprotocol 76afdaf9b208f45ee14d854f23c4d77169f8f243
 process-spawn-cpp https://github.com/mojyack/process-spawn-cpp 5bb95b1612858775909a7e302ac2b7b9bf971228

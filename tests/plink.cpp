@@ -10,10 +10,10 @@
 using Client = plink::PeerLinkerClientBackend;
 
 auto prepare_client_1(Client& client) -> void {
-    client.on_auth_request = [](std::string_view name, net::BytesRef secret) -> bool {
+    client.on_auth_request = [](std::string_view name, BytesSpan secret) -> bool {
         constexpr auto error_value = false;
         ensure_v(name == "2");
-        ensure_v(from_span(secret) == "SECRET");
+        ensure_v(span_as_str(secret) == "SECRET");
         return true;
     };
 }
@@ -35,8 +35,8 @@ auto start_client_2(Client& client) -> coop::Async<bool> {
         .peer_linker_port = 8080,
         .pad_name         = "2",
         .peer_info        = plink::PeerLinkerClientBackend::Params::PeerInfo{
-                   .pad_name = "1",
-                   .secret   = copy(to_span("SECRET")),
+            .pad_name = "1",
+            .secret   = copy(str_as_span("SECRET")),
         },
     });
 }

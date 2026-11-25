@@ -9,7 +9,7 @@ auto generate_cert(const char* const secret_file, const char* const content_file
     unwrap(secret, read_file(secret_file));
     unwrap(content, read_file(content_file));
     auto key = SessionKey(secret);
-    unwrap(cert, key.generate_user_certificate(from_span(content)));
+    unwrap(cert, key.generate_user_certificate(span_as_str(content)));
     std::print("{}", cert.data());
     return true;
 }
@@ -18,7 +18,7 @@ auto verify_cert(const char* const secret_file, const char* const content_file) 
     unwrap(secret, read_file(secret_file));
     unwrap(cert, read_file(content_file));
     auto key = SessionKey(secret);
-    unwrap(parsed, key.split_user_certificate_to_hash_and_content(from_span(cert)));
+    unwrap(parsed, key.split_user_certificate_to_hash_and_content(span_as_str(cert)));
     const auto [hash_str, content] = parsed;
     return key.verify_user_certificate_hash(hash_str, content);
 }

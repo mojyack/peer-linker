@@ -58,7 +58,8 @@ auto verify_user_cert(Server& server, const std::string_view cert) -> bool {
 }
 
 } // namespace
-auto Session::handle_activation(const net::BytesRef payload, Server& server) -> bool {
+
+auto Session::handle_activation(const BytesSpan payload, Server& server) -> bool {
     auto& logger = server.logger;
 
     unwrap(request, (serde::load<net::BinaryFormat, proto::ActivateSession>(payload)));

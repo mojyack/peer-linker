@@ -22,8 +22,8 @@ struct Link {
     constexpr static auto pt = net::PacketType(0x05);
 
     SerdeFieldsBegin;
-    std::string     SerdeField(requestee_name);
-    net::BytesArray SerdeField(secret);
+    std::string SerdeField(requestee_name);
+    BytesVec    SerdeField(secret);
     SerdeFieldsEnd;
 };
 
@@ -42,8 +42,8 @@ struct Auth {
     constexpr static auto pt = net::PacketType(0x08);
 
     SerdeFieldsBegin;
-    std::string     SerdeField(requester_name);
-    net::BytesArray SerdeField(secret);
+    std::string SerdeField(requester_name);
+    BytesVec    SerdeField(secret);
     SerdeFieldsEnd;
 };
 
